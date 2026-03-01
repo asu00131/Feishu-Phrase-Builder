@@ -1,58 +1,108 @@
 "use client"
 
 import * as React from "react"
-import { fetchFeishuData } from "@/lib/mock-data"
+import { fetchFeishuData, parseCSVContent } from "@/lib/mock-data"
 import { TableData } from "@/lib/types"
 import { 
   RefreshCcw, 
   RotateCcw,
   Layers,
   ShoppingBag,
-  Sparkles
+  Sparkles,
+  Settings,
+  Upload,
+  Link as LinkIcon
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { DataTable } from "@/components/dashboard/data-table"
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger 
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 
 export default function DashboardPage() {
   const [data, setData] = React.useState<TableData[]>([])
   const [loading, setLoading] = React.useState(true)
   const [activeTab, setActiveTab] = React.useState("preview")
   
+  // 数据源配置状态
+  const [csvUrl, setCsvUrl] = React.useState('https://raw.githubusercontent.com/asu00131/Feishu-Phrase-Builder/refs/heads/main/src/app/%E7%9B%B4%E6%92%AD%E8%AF%9D%E6%9C%AF_%E6%95%B0%E6%8D%AE%E8%A1%A8.csv')
+  const [tempUrl, setTempUrl] = React.useState(csvUrl)
+  const [dialogOpen, setDialogOpen] = React.useState(false)
+
   // 选中的产品分类/场景
   const [selectedCategory, setSelectedCategory] = React.useState<string>("")
   // 每个环节当前显示的话术索引
   const [segmentIndices, setSegmentIndices] = React.useState<Record<string, number>>({})
 
-  const loadData = React.useCallback(async () => {
-    setLoading(true)
-    try {
-      const result = await fetchFeishuData()
-      setData(result)
-      if (result.length > 0) {
-        // 自动识别分类/场景字段并设置初始选中
-        const catKey = Object.keys(result[0]).find(k => k.includes('场景') || k.includes('分类') || k.includes('产品') || k.includes('名称'))
-        if (catKey) {
-          const categories = Array.from(new Set(result.map(item => item[catKey]).filter(Boolean)))
-          // 默认展示条件：场景 = 灯饰介绍
-          const target = categories.find(c => String(c).includes('灯饰介绍'))
-          if (target) {
-            setSelectedCategory(String(target))
-          } else if (categories.length > 0) {
-            setSelectedCategory(categories[0] as string)
-          }
+  // 初始化布局逻辑
+  const initializeLayout = React.useCallback((result: TableData[]) => {
+    if (result.length > 0) {
+      const catKey = Object.keys(result[0]).find(k => k.includes('场景') || k.includes('分类') || k.includes('产品') || k.includes('名称'))
+      if (catKey) {
+        const categories = Array.from(new Set(result.map(item => item[catKey]).filter(Boolean)))
+        const target = categories.find(c => String(c).includes('灯饰介绍'))
+        if (target) {
+          setSelectedCategory(String(target))
+        } else if (categories.length > 0) {
+          setSelectedCategory(categories[0] as string)
         }
       }
+    }
+  }, [])
+
+  const loadData = React.useCallback(async (urlOverride?: string) => {
+    setLoading(true)
+    try {
+      const result = await fetchFeishuData(urlOverride || csvUrl)
+      setData(result)
+      initializeLayout(result)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [csvUrl, initializeLayout])
 
   React.useEffect(() => {
     loadData()
   }, [loadData])
+
+  // 处理在线链接更新
+  const handleUrlUpdate = () => {
+    setCsvUrl(tempUrl)
+    setDialogOpen(false)
+    loadData(tempUrl)
+  }
+
+  // 处理本地文件上传
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    
+    setLoading(true)
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const text = event.target?.result as string
+      try {
+        const result = parseCSVContent(text)
+        setData(result)
+        initializeLayout(result)
+        setDialogOpen(false)
+      } catch (err) {
+        console.error("CSV 解析失败", err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    reader.readAsText(file)
+  }
 
   // 动态字段映射辅助函数
   const getField = (item: any, keywords: string[]) => {
@@ -60,7 +110,6 @@ export default function DashboardPage() {
     return key ? item[key] : null
   }
 
-  // 按模块分组数据（左侧环节）
   const segments = React.useMemo(() => {
     const groups: Record<string, TableData[]> = {}
     data.forEach(item => {
@@ -71,14 +120,12 @@ export default function DashboardPage() {
     return groups
   }, [data])
 
-  // 所有分类/场景（右侧标签）
   const allCategories = React.useMemo(() => {
     const key = data.length > 0 ? Object.keys(data[0]).find(k => k.includes('场景') || k.includes('分类') || k.includes('产品') || k.includes('类别')) : null
     if (!key) return []
     return Array.from(new Set(data.map(item => item[key]).filter(Boolean)))
   }, [data])
 
-  // 当前选中分类/场景下的话术
   const categoryScripts = React.useMemo(() => {
     const key = data.length > 0 ? Object.keys(data[0]).find(k => k.includes('场景') || k.includes('分类') || k.includes('产品') || k.includes('类别')) : null
     if (!key || !selectedCategory) return []
@@ -100,7 +147,6 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-[#F8FAFC]">
-      {/* 顶部导航 */}
       <header className="bg-white border-b px-8 py-3 flex items-center justify-between sticky top-0 z-50 shadow-sm">
         <div className="flex items-center gap-8">
           <div className="flex items-center gap-2">
@@ -121,17 +167,56 @@ export default function DashboardPage() {
           </Tabs>
         </div>
         <div className="flex items-center gap-4">
-          <Button variant="outline" size="sm" onClick={loadData} disabled={loading} className="rounded-full bg-white hover:bg-slate-50 border-slate-200">
-            <RefreshCcw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> 同步飞书数据
-          </Button>
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm" className="rounded-full bg-white hover:bg-slate-50 border-slate-200">
+                <Settings className="h-4 w-4 mr-2" /> 数据源设置
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>配置直播话术表数据源</DialogTitle>
+              </DialogHeader>
+              <Tabs defaultValue="url" className="w-full mt-4">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="url">在线链接 (URL)</TabsTrigger>
+                  <TabsTrigger value="upload">本地上传 (CSV)</TabsTrigger>
+                </TabsList>
+                <TabsContent value="url" className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="url">CSV 文件地址</Label>
+                    <Input 
+                      id="url" 
+                      placeholder="请输入 CSV 文件的 https 链接" 
+                      value={tempUrl} 
+                      onChange={(e) => setTempUrl(e.target.value)}
+                    />
+                    <p className="text-[10px] text-slate-400">支持飞书导出的公共链接或 GitHub Raw 链接</p>
+                  </div>
+                  <Button onClick={handleUrlUpdate} className="w-full">更新链接并同步</Button>
+                </TabsContent>
+                <TabsContent value="upload" className="space-y-4 py-4">
+                  <div className="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-2xl p-8 hover:bg-slate-50 transition-colors cursor-pointer relative">
+                    <Upload className="h-8 w-8 text-slate-400 mb-2" />
+                    <p className="text-sm font-medium text-slate-600">点击或拖拽 CSV 文件到此处</p>
+                    <p className="text-[10px] text-slate-400 mt-1">仅支持 .csv 格式</p>
+                    <input 
+                      type="file" 
+                      accept=".csv" 
+                      onChange={handleFileUpload}
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                    />
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </DialogContent>
+          </Dialog>
         </div>
       </header>
 
       <main className="flex-1 p-8">
         {activeTab === "preview" ? (
           <div className="grid grid-cols-12 gap-8 max-w-[1700px] mx-auto">
-            
-            {/* 左列：策略流程 (7/12) */}
             <div className="col-span-12 lg:col-span-7 space-y-6">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-3">
@@ -158,7 +243,6 @@ export default function DashboardPage() {
                 </div>
               ) : Object.keys(segments).length > 0 ? (
                 <div className="space-y-6 relative">
-                  {/* 时间轴线 */}
                   <div className="absolute left-6 top-8 bottom-8 w-0.5 bg-gradient-to-b from-primary/20 via-primary/5 to-transparent" />
                   
                   {Object.keys(segments).map((moduleName, index) => {
@@ -166,7 +250,6 @@ export default function DashboardPage() {
                     const currentItem = segments[moduleName][idx]
                     return (
                       <div key={moduleName} className="relative pl-14 animate-in fade-in slide-in-from-bottom-4" style={{ animationDelay: `${index * 100}ms` }}>
-                        {/* 环节序号 */}
                         <div className="absolute left-0 top-0 w-12 h-12 bg-white border-4 border-slate-50 rounded-2xl flex items-center justify-center shadow-md z-10">
                           <span className="text-primary font-black text-lg">{index + 1}</span>
                         </div>
@@ -191,9 +274,6 @@ export default function DashboardPage() {
                           
                           <div className="bg-slate-50/80 rounded-3xl p-6 border border-slate-100 relative overflow-hidden">
                              <div className="absolute top-0 left-0 w-1 h-full bg-primary/20" />
-                             <div className="flex items-center gap-2 mb-4">
-                               <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Live Script Content</span>
-                             </div>
                              <p className="text-slate-700 leading-relaxed text-base whitespace-pre-wrap font-medium">
                                {getContent(currentItem)}
                              </p>
@@ -210,9 +290,6 @@ export default function DashboardPage() {
                                  重读强调
                                </div>
                              </div>
-                             <div className="text-[10px] font-bold text-slate-300 italic">
-                               建议语速：中速 (180-200字/min)
-                             </div>
                           </div>
                         </div>
                       </div>
@@ -227,9 +304,7 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {/* 右列：产品核心 (5/12) */}
             <div className="col-span-12 lg:col-span-5 space-y-8">
-              {/* 产品/场景分类选择 */}
               <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100">
                 <div className="flex items-center gap-3 mb-8">
                   <div className="bg-emerald-100 p-2 rounded-xl">
@@ -256,80 +331,46 @@ export default function DashboardPage() {
                       {String(cat)}
                     </Button>
                   ))}
-                  {allCategories.length === 0 && (
-                    <div className="text-slate-400 text-sm py-4 italic">等待数据同步...</div>
-                  )}
                 </div>
               </div>
 
-              {/* 选中产品/场景的话术详情卡片 */}
               <div className="bg-white rounded-[3rem] p-10 shadow-xl shadow-slate-200/40 border border-slate-100 relative overflow-hidden group min-h-[500px]">
                 <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-50 rounded-full -mr-24 -mt-24 transition-transform group-hover:scale-110" />
-                
-                <div className="flex items-center justify-between mb-8 relative">
-                  <Badge className="bg-emerald-500 text-white border-none px-4 py-1 rounded-full font-bold shadow-sm shadow-emerald-200">
-                    核心卖点话术
-                  </Badge>
-                </div>
-
-                <div className="space-y-6 relative">
-                  <div className="flex items-center gap-2">
-                    <div className="w-1.5 h-5 bg-emerald-500 rounded-full" />
-                    <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Script Details</span>
+                <Badge className="bg-emerald-500 text-white border-none px-4 py-1 rounded-full font-bold mb-8 relative">
+                  核心卖点话术
+                </Badge>
+                <ScrollArea className="h-[450px] pr-6 relative">
+                  <div className="text-slate-700 leading-relaxed text-xl font-semibold whitespace-pre-wrap">
+                    {categoryScripts.length > 0 ? (
+                      getContent(categoryScripts[0])
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-full pt-20 text-slate-300">
+                        <ShoppingBag className="h-16 w-16 mb-4 opacity-10" />
+                        <p className="text-sm">请在上方选择分类以刷新话术</p>
+                      </div>
+                    )}
                   </div>
-                  
-                  <ScrollArea className="h-[450px] pr-6">
-                    <div className="text-slate-700 leading-relaxed text-xl font-semibold whitespace-pre-wrap">
-                      {categoryScripts.length > 0 ? (
-                        getContent(categoryScripts[0])
-                      ) : (
-                        <div className="flex flex-col items-center justify-center h-full pt-20 text-slate-300">
-                          <ShoppingBag className="h-16 w-16 mb-4 opacity-10" />
-                          <p className="text-sm">请在上方选择分类以刷新话术</p>
-                        </div>
-                      )}
-                    </div>
-                  </ScrollArea>
-                </div>
-                
-                <div className="absolute bottom-10 left-10 right-10 flex justify-between items-center text-[10px] font-bold text-slate-300 uppercase tracking-tighter">
-                  <span>Smart Live System v2.0</span>
-                  <span>Data Synced via GitHub</span>
-                </div>
+                </ScrollArea>
               </div>
             </div>
-
           </div>
         ) : (
-          <div className="max-w-[1400px] mx-auto animate-in fade-in zoom-in-95 duration-500">
+          <div className="max-w-[1400px] mx-auto">
              <div className="bg-white rounded-[3rem] p-12 shadow-sm border border-slate-100">
-                <div className="flex items-center justify-between mb-10">
-                  <div>
-                    <h2 className="text-3xl font-black text-slate-800 tracking-tight">底层数据映射表</h2>
-                    <p className="text-slate-400 mt-1 font-medium">查看从 CSV 文件中解析出的所有原始字段</p>
-                  </div>
-                </div>
+                <h2 className="text-3xl font-black text-slate-800 tracking-tight mb-2">底层数据映射表</h2>
+                <p className="text-slate-400 mb-10 font-medium">查看从当前数据源解析出的所有原始字段</p>
                 <DataTable data={data} />
              </div>
           </div>
         )}
       </main>
 
-      {/* 页脚 */}
       <footer className="bg-white border-t py-6 px-10">
-        <div className="flex justify-between items-center max-w-[1700px] mx-auto">
-          <div className="flex items-center gap-6">
-            <p className="text-xs text-slate-400 font-bold">
-              © 2024 直播话术智能看板 · 自动适配 CSV 架构
-            </p>
-            <div className="flex gap-2">
-              <Badge variant="outline" className="text-[9px] border-slate-100 text-slate-400 rounded-sm">UTF-8</Badge>
-              <Badge variant="outline" className="text-[9px] border-slate-100 text-slate-400 rounded-sm">AUTO-MAPPING</Badge>
-            </div>
-          </div>
+        <div className="flex justify-between items-center max-w-[1700px] mx-auto text-xs text-slate-400 font-bold">
+          <p>© 2024 直播话术智能看板 · 支持 URL/本地多数据源</p>
           <div className="flex items-center gap-4">
             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Data Source Connected</span>
+            <span className="uppercase tracking-widest text-[10px]">Data Stream Active</span>
           </div>
         </div>
       </footer>
