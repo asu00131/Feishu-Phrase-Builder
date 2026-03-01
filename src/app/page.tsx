@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -11,7 +12,8 @@ import {
   Sparkles,
   Settings,
   Upload,
-  Link as LinkIcon
+  Link as LinkIcon,
+  ChevronDown
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -27,6 +29,13 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 export default function DashboardPage() {
   const [data, setData] = React.useState<TableData[]>([])
@@ -306,31 +315,34 @@ export default function DashboardPage() {
 
             <div className="col-span-12 lg:col-span-5 space-y-8">
               <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100">
-                <div className="flex items-center gap-3 mb-8">
+                <div className="flex items-center gap-3 mb-6">
                   <div className="bg-emerald-100 p-2 rounded-xl">
                     <ShoppingBag className="h-5 w-5 text-emerald-600" />
                   </div>
                   <div>
                     <h2 className="text-xl font-bold text-slate-800">产品核心展示</h2>
-                    <p className="text-xs text-slate-400 mt-0.5">选择分类/场景快速查看对应话术</p>
+                    <p className="text-xs text-slate-400 mt-0.5">从下拉列表中选择一个特定场景/分类</p>
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2.5">
-                  {allCategories.map(cat => (
-                    <Button
-                      key={String(cat)}
-                      variant={selectedCategory === String(cat) ? "default" : "outline"}
-                      onClick={() => setSelectedCategory(String(cat))}
-                      className={`rounded-2xl px-5 h-10 font-bold transition-all border-slate-200 ${
-                        selectedCategory === String(cat) 
-                        ? "bg-slate-900 text-white shadow-lg shadow-slate-200 scale-105" 
-                        : "bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-300"
-                      }`}
-                    >
-                      {String(cat)}
-                    </Button>
-                  ))}
+                <div className="space-y-4">
+                  <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">选择筛选条件</Label>
+                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                    <SelectTrigger className="w-full h-12 rounded-2xl border-slate-200 bg-white shadow-sm font-bold text-slate-700 focus:ring-primary/20">
+                      <SelectValue placeholder="请选择场景或分类" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-2xl border-slate-100 shadow-xl max-h-[300px]">
+                      {allCategories.map(cat => (
+                        <SelectItem 
+                          key={String(cat)} 
+                          value={String(cat)} 
+                          className="font-semibold text-slate-600 focus:bg-slate-50 py-3 cursor-pointer"
+                        >
+                          {String(cat)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
