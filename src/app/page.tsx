@@ -13,7 +13,8 @@ import {
   Settings,
   Upload,
   Link as LinkIcon,
-  ChevronDown
+  ChevronDown,
+  Box
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -47,9 +48,11 @@ export default function DashboardPage() {
   const [tempUrl, setTempUrl] = React.useState(csvUrl)
   const [dialogOpen, setDialogOpen] = React.useState(false)
 
-  // 选中的产品分类/场景
-  const [selectedCategory, setSelectedCategory] = React.useState<string>("")
-  // 每个环节当前显示的话术索引
+  // 联动筛选状态
+  const [selectedScene, setSelectedScene] = React.useState<string>("")
+  const [selectedProduct, setSelectedProduct] = React.useState<string>("")
+  
+  // 每个环节当前显示的话术索引（左侧流程）
   const [segmentIndices, setSegmentIndices] = React.useState<Record<string, number>>({})
 
   // 动态字段映射辅助函数
@@ -65,14 +68,23 @@ export default function DashboardPage() {
   // 初始化布局逻辑
   const initializeLayout = React.useCallback((result: TableData[]) => {
     if (result.length > 0) {
-      const catKey = getFieldKey(result[0], ['场景', '分类', '产品', '名称'])
-      if (catKey) {
-        const categories = Array.from(new Set(result.map(item => item[catKey]).filter(Boolean)))
-        const target = categories.find(c => String(c).includes('灯饰介绍'))
-        if (target) {
-          setSelectedCategory(String(target))
-        } else if (categories.length > 0) {
-          setSelectedCategory(String(categories[0]))
+      // 1. 尝试初始化场景
+      const sceneKey = getFieldKey(result[0], ['场景', '类别', '分类'])
+      if (sceneKey) {
+        const scenes = Array.from(new Set(result.map(item => String(item[sceneKey])).filter(Boolean)))
+        const defaultScene = scenes.find(s => s.includes('灯饰介绍')) || scenes[0]
+        setSelectedScene(defaultScene)
+
+        // 2. 尝试初始化该场景下的第一个产品
+        const productKey = getFieldKey(result[0], ['产品', '名称', '标题'])
+        if (productKey) {
+          const products = result
+            .filter(item => String(item[sceneKey]) === defaultScene)
+            .map(item => String(item[productKey]))
+            .filter(Boolean)
+          if (products.length > 0) {
+            setSelectedProduct(products[0])
+          }
         }
       }
     }
@@ -123,6 +135,7 @@ export default function DashboardPage() {
     reader.readAsText(file)
   }
 
+  // 计算属性：左侧策略环节
   const segments = React.useMemo(() => {
     const groups: Record<string, TableData[]> = {}
     data.forEach(item => {
@@ -133,19 +146,41 @@ export default function DashboardPage() {
     return groups
   }, [data, getField])
 
-  const allCategories = React.useMemo(() => {
+  // 计算属性：所有可用场景
+  const allScenes = React.useMemo(() => {
     if (data.length === 0) return []
-    const key = getFieldKey(data[0], ['场景', '分类', '产品', '类别'])
+    const key = getFieldKey(data[0], ['场景', '类别', '分类'])
     if (!key) return []
-    return Array.from(new Set(data.map(item => item[key]).filter(Boolean)))
+    return Array.from(new Set(data.map(item => String(item[key])).filter(Boolean)))
   }, [data, getFieldKey])
 
-  const categoryScripts = React.useMemo(() => {
-    if (data.length === 0 || !selectedCategory) return []
-    const key = getFieldKey(data[0], ['场景', '分类', '产品', '类别'])
-    if (!key) return []
-    return data.filter(item => String(item[key]) === selectedCategory)
-  }, [data, selectedCategory, getFieldKey])
+  // 计算属性：当前场景下的所有产品
+  const productsInScene = React.useMemo(() => {
+    if (data.length === 0 || !selectedScene) return []
+    const sceneKey = getFieldKey(data[0], ['场景', '类别', '分类'])
+    const productKey = getFieldKey(data[0], ['产品', '名称', '标题'])
+    if (!sceneKey || !productKey) return []
+    
+    return Array.from(new Set(
+      data
+        .filter(item => String(item[sceneKey]) === selectedScene)
+        .map(item => String(item[productKey]))
+        .filter(Boolean)
+    ))
+  }, [data, selectedScene, getFieldKey])
+
+  // 计算属性：选中的具体话术
+  const activeScript = React.useMemo(() => {
+    if (data.length === 0 || !selectedScene || !selectedProduct) return null
+    const sceneKey = getFieldKey(data[0], ['场景', '类别', '分类'])
+    const productKey = getFieldKey(data[0], ['产品', '名称', '标题'])
+    if (!sceneKey || !productKey) return null
+
+    return data.find(item => 
+      String(item[sceneKey]) === selectedScene && 
+      String(item[productKey]) === selectedProduct
+    )
+  }, [data, selectedScene, selectedProduct, getFieldKey])
 
   const handleShuffle = (module: string) => {
     const count = segments[module]?.length || 0
@@ -158,6 +193,15 @@ export default function DashboardPage() {
 
   const getContent = (item: any) => {
     return getField(item, ['话术', '内容', '文本', '描述']) || "暂无话术详情"
+  }
+
+  // 当场景改变时，重置产品选中项
+  const handleSceneChange = (scene: string) => {
+    setSelectedScene(scene)
+    const sceneKey = getFieldKey(data[0], ['场景', '类别', '分类'])
+    const productKey = getFieldKey(data[0], ['产品', '名称', '标题'])
+    const firstProduct = data.find(item => String(item[sceneKey]) === scene)?.[productKey!]
+    setSelectedProduct(firstProduct ? String(firstProduct) : "")
   }
 
   return (
@@ -184,7 +228,7 @@ export default function DashboardPage() {
         <div className="flex items-center gap-4">
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline" size="sm" className="rounded-full bg-white hover:bg-slate-50 border-slate-200">
+              <Button variant="outline" size="sm" className="rounded-full bg-white hover:bg-slate-50 border-slate-200 shadow-sm">
                 <Settings className="h-4 w-4 mr-2" /> 数据源设置
               </Button>
             </DialogTrigger>
@@ -232,19 +276,20 @@ export default function DashboardPage() {
       <main className="flex-1 p-8">
         {activeTab === "preview" ? (
           <div className="grid grid-cols-12 gap-8 max-w-[1700px] mx-auto">
+            {/* 左侧：策略链路 */}
             <div className="col-span-12 lg:col-span-7 space-y-6">
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center justify-between mb-2 px-2">
                 <div className="flex items-center gap-3">
                   <div className="bg-blue-100 p-2 rounded-xl">
                     <Layers className="h-5 w-5 text-blue-600" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-slate-800">策略链路话术</h2>
+                    <h2 className="text-xl font-bold text-slate-800">策略流程话术</h2>
                     <p className="text-xs text-slate-400 mt-0.5">根据直播阶段自动适配最优口播模板</p>
                   </div>
                 </div>
                 <Button variant="ghost" size="sm" onClick={() => loadData()} className="text-primary font-bold hover:bg-primary/5">
-                  <RotateCcw className="h-4 w-4 mr-1.5" /> 随机换一批
+                  <RotateCcw className="h-4 w-4 mr-1.5" /> 随机重置
                 </Button>
               </div>
 
@@ -273,8 +318,8 @@ export default function DashboardPage() {
                           <div className="flex items-center justify-between mb-5">
                             <div className="flex items-center gap-3">
                               <span className="font-bold text-lg text-slate-800">{moduleName}</span>
-                              <Badge variant="secondary" className="bg-primary/5 text-primary border-none font-bold py-1 px-3">
-                                版本 {idx + 1}
+                              <Badge variant="secondary" className="bg-primary/5 text-primary border-none font-bold py-1 px-3 text-[10px]">
+                                备选 {idx + 1}
                               </Badge>
                             </div>
                             <Button 
@@ -283,7 +328,7 @@ export default function DashboardPage() {
                               onClick={() => handleShuffle(moduleName)}
                               className="rounded-full border-slate-200 text-slate-500 hover:text-primary hover:border-primary/30 gap-2 font-bold px-4 transition-all"
                             >
-                              <RotateCcw className="h-3.5 w-3.5" /> 换个说法
+                              <RotateCcw className="h-3.5 w-3.5" /> 换个版本
                             </Button>
                           </div>
                           
@@ -293,19 +338,6 @@ export default function DashboardPage() {
                                {getContent(currentItem)}
                              </p>
                           </div>
-                          
-                          <div className="flex justify-between items-center mt-6">
-                             <div className="flex gap-4">
-                               <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400">
-                                 <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                                 核心名词
-                               </div>
-                               <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400">
-                                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                 重读强调
-                               </div>
-                             </div>
-                          </div>
                         </div>
                       </div>
                     )
@@ -314,61 +346,91 @@ export default function DashboardPage() {
               ) : (
                 <div className="p-20 text-center bg-white rounded-[3rem] border-2 border-dashed border-slate-200 text-slate-400">
                   <Layers className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                  <p>未检测到有效的流程数据，请检查 CSV 字段</p>
+                  <p>未检测到有效的流程数据</p>
                 </div>
               )}
             </div>
 
+            {/* 右侧：产品核心展示（联动筛选） */}
             <div className="col-span-12 lg:col-span-5 space-y-8">
               <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100">
-                <div className="flex items-center gap-3 mb-6">
+                <div className="flex items-center gap-3 mb-8">
                   <div className="bg-emerald-100 p-2 rounded-xl">
                     <ShoppingBag className="h-5 w-5 text-emerald-600" />
                   </div>
                   <div>
                     <h2 className="text-xl font-bold text-slate-800">产品核心展示</h2>
-                    <p className="text-xs text-slate-400 mt-0.5">从下方下拉列表中选择具体场景</p>
+                    <p className="text-xs text-slate-400 mt-0.5">多维联动筛选，精准获取话术</p>
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">当前筛选场景</Label>
-                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                    <SelectTrigger className="w-full h-12 rounded-2xl border-slate-200 bg-white shadow-sm font-bold text-slate-700 focus:ring-primary/20">
-                      <SelectValue placeholder="请选择场景或分类" />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-2xl border-slate-100 shadow-xl max-h-[300px]">
-                      {allCategories.length > 0 ? (
-                        allCategories.map(cat => (
-                          <SelectItem 
-                            key={String(cat)} 
-                            value={String(cat)} 
-                            className="font-semibold text-slate-600 focus:bg-slate-50 py-3 cursor-pointer"
-                          >
-                            {String(cat)}
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <div className="p-4 text-center text-xs text-slate-400">暂无场景数据</div>
-                      )}
-                    </SelectContent>
-                  </Select>
+                <div className="space-y-6">
+                  {/* 第一级：场景 */}
+                  <div className="space-y-2.5">
+                    <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">直播场景 (第一级)</Label>
+                    <Select value={selectedScene} onValueChange={handleSceneChange}>
+                      <SelectTrigger className="w-full h-11 rounded-xl border-slate-200 bg-white shadow-sm font-bold text-slate-700 focus:ring-primary/10">
+                        <SelectValue placeholder="请选择场景" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl border-slate-100 shadow-xl max-h-[300px]">
+                        {allScenes.length > 0 ? (
+                          allScenes.map(scene => (
+                            <SelectItem key={scene} value={scene} className="font-semibold text-slate-600 py-2.5 cursor-pointer">
+                              {scene}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <div className="p-4 text-center text-xs text-slate-400">暂无场景</div>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* 第二级：产品 */}
+                  <div className="space-y-2.5">
+                    <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">具体产品 (第二级)</Label>
+                    <Select value={selectedProduct} onValueChange={setSelectedProduct}>
+                      <SelectTrigger className="w-full h-11 rounded-xl border-slate-200 bg-white shadow-sm font-bold text-slate-700 focus:ring-primary/10">
+                        <SelectValue placeholder="请选择产品" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl border-slate-100 shadow-xl max-h-[300px]">
+                        {productsInScene.length > 0 ? (
+                          productsInScene.map(prod => (
+                            <SelectItem key={prod} value={prod} className="font-semibold text-slate-600 py-2.5 cursor-pointer">
+                              {prod}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <div className="p-4 text-center text-xs text-slate-400">该场景下暂无产品</div>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
 
+              {/* 核心话术展示区 */}
               <div className="bg-white rounded-[3rem] p-10 shadow-xl shadow-slate-200/40 border border-slate-100 relative overflow-hidden group min-h-[500px]">
                 <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-50 rounded-full -mr-24 -mt-24 transition-transform group-hover:scale-110" />
-                <Badge className="bg-emerald-500 text-white border-none px-4 py-1 rounded-full font-bold mb-8 relative">
-                  核心卖点话术
-                </Badge>
-                <ScrollArea className="h-[450px] pr-6 relative">
+                <div className="flex items-center gap-2 mb-8 relative">
+                  <Badge className="bg-emerald-500 text-white border-none px-4 py-1 rounded-full font-bold">
+                    核心卖点话术
+                  </Badge>
+                  {selectedProduct && (
+                    <Badge variant="outline" className="border-emerald-200 text-emerald-600 bg-emerald-50/30 px-3 py-1 rounded-full font-bold">
+                      <Box className="w-3 h-3 mr-1.5" /> {selectedProduct}
+                    </Badge>
+                  )}
+                </div>
+                
+                <ScrollArea className="h-[400px] pr-6 relative">
                   <div className="text-slate-700 leading-relaxed text-xl font-semibold whitespace-pre-wrap">
-                    {categoryScripts.length > 0 ? (
-                      getContent(categoryScripts[0])
+                    {activeScript ? (
+                      getContent(activeScript)
                     ) : (
                       <div className="flex flex-col items-center justify-center h-full pt-20 text-slate-300">
                         <ShoppingBag className="h-16 w-16 mb-4 opacity-10" />
-                        <p className="text-sm">请在上方选择分类以刷新话术</p>
+                        <p className="text-sm">请在上方选择场景和产品</p>
                       </div>
                     )}
                   </div>
@@ -380,7 +442,7 @@ export default function DashboardPage() {
           <div className="max-w-[1400px] mx-auto">
              <div className="bg-white rounded-[3rem] p-12 shadow-sm border border-slate-100">
                 <h2 className="text-3xl font-black text-slate-800 tracking-tight mb-2">底层数据映射表</h2>
-                <p className="text-slate-400 mb-10 font-medium">查看从当前数据源解析出的所有原始字段</p>
+                <p className="text-slate-400 mb-10 font-medium">查看当前数据源的所有原始字段内容</p>
                 <DataTable data={data} />
              </div>
           </div>
@@ -389,7 +451,7 @@ export default function DashboardPage() {
 
       <footer className="bg-white border-t py-6 px-10">
         <div className="flex justify-between items-center max-w-[1700px] mx-auto text-xs text-slate-400 font-bold">
-          <p>© 2024 直播话术智能看板 · 支持 URL/本地多数据源</p>
+          <p>© 2024 直播话术智能看板 · 双级联动话术引擎</p>
           <div className="flex items-center gap-4">
             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             <span className="uppercase tracking-widest text-[10px]">Data Stream Active</span>
