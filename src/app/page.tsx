@@ -52,21 +52,31 @@ export default function DashboardPage() {
   // 每个环节当前显示的话术索引
   const [segmentIndices, setSegmentIndices] = React.useState<Record<string, number>>({})
 
+  // 动态字段映射辅助函数
+  const getFieldKey = React.useCallback((item: any, keywords: string[]) => {
+    return Object.keys(item).find(k => keywords.some(kw => k.includes(kw)))
+  }, [])
+
+  const getField = React.useCallback((item: any, keywords: string[]) => {
+    const key = getFieldKey(item, keywords)
+    return key ? item[key] : null
+  }, [getFieldKey])
+
   // 初始化布局逻辑
   const initializeLayout = React.useCallback((result: TableData[]) => {
     if (result.length > 0) {
-      const catKey = Object.keys(result[0]).find(k => k.includes('场景') || k.includes('分类') || k.includes('产品') || k.includes('名称'))
+      const catKey = getFieldKey(result[0], ['场景', '分类', '产品', '名称'])
       if (catKey) {
         const categories = Array.from(new Set(result.map(item => item[catKey]).filter(Boolean)))
         const target = categories.find(c => String(c).includes('灯饰介绍'))
         if (target) {
           setSelectedCategory(String(target))
         } else if (categories.length > 0) {
-          setSelectedCategory(categories[0] as string)
+          setSelectedCategory(String(categories[0]))
         }
       }
     }
-  }, [])
+  }, [getFieldKey])
 
   const loadData = React.useCallback(async (urlOverride?: string) => {
     setLoading(true)
@@ -113,12 +123,6 @@ export default function DashboardPage() {
     reader.readAsText(file)
   }
 
-  // 动态字段映射辅助函数
-  const getField = (item: any, keywords: string[]) => {
-    const key = Object.keys(item).find(k => keywords.some(kw => k.includes(kw)))
-    return key ? item[key] : null
-  }
-
   const segments = React.useMemo(() => {
     const groups: Record<string, TableData[]> = {}
     data.forEach(item => {
@@ -127,19 +131,21 @@ export default function DashboardPage() {
       groups[module].push(item)
     })
     return groups
-  }, [data])
+  }, [data, getField])
 
   const allCategories = React.useMemo(() => {
-    const key = data.length > 0 ? Object.keys(data[0]).find(k => k.includes('场景') || k.includes('分类') || k.includes('产品') || k.includes('类别')) : null
+    if (data.length === 0) return []
+    const key = getFieldKey(data[0], ['场景', '分类', '产品', '类别'])
     if (!key) return []
     return Array.from(new Set(data.map(item => item[key]).filter(Boolean)))
-  }, [data])
+  }, [data, getFieldKey])
 
   const categoryScripts = React.useMemo(() => {
-    const key = data.length > 0 ? Object.keys(data[0]).find(k => k.includes('场景') || k.includes('分类') || k.includes('产品') || k.includes('类别')) : null
-    if (!key || !selectedCategory) return []
-    return data.filter(item => item[key] === selectedCategory)
-  }, [data, selectedCategory])
+    if (data.length === 0 || !selectedCategory) return []
+    const key = getFieldKey(data[0], ['场景', '分类', '产品', '类别'])
+    if (!key) return []
+    return data.filter(item => String(item[key]) === selectedCategory)
+  }, [data, selectedCategory, getFieldKey])
 
   const handleShuffle = (module: string) => {
     const count = segments[module]?.length || 0
@@ -321,26 +327,30 @@ export default function DashboardPage() {
                   </div>
                   <div>
                     <h2 className="text-xl font-bold text-slate-800">产品核心展示</h2>
-                    <p className="text-xs text-slate-400 mt-0.5">从下拉列表中选择一个特定场景/分类</p>
+                    <p className="text-xs text-slate-400 mt-0.5">从下方下拉列表中选择具体场景</p>
                   </div>
                 </div>
 
                 <div className="space-y-4">
-                  <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">选择筛选条件</Label>
+                  <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">当前筛选场景</Label>
                   <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                     <SelectTrigger className="w-full h-12 rounded-2xl border-slate-200 bg-white shadow-sm font-bold text-slate-700 focus:ring-primary/20">
                       <SelectValue placeholder="请选择场景或分类" />
                     </SelectTrigger>
                     <SelectContent className="rounded-2xl border-slate-100 shadow-xl max-h-[300px]">
-                      {allCategories.map(cat => (
-                        <SelectItem 
-                          key={String(cat)} 
-                          value={String(cat)} 
-                          className="font-semibold text-slate-600 focus:bg-slate-50 py-3 cursor-pointer"
-                        >
-                          {String(cat)}
-                        </SelectItem>
-                      ))}
+                      {allCategories.length > 0 ? (
+                        allCategories.map(cat => (
+                          <SelectItem 
+                            key={String(cat)} 
+                            value={String(cat)} 
+                            className="font-semibold text-slate-600 focus:bg-slate-50 py-3 cursor-pointer"
+                          >
+                            {String(cat)}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <div className="p-4 text-center text-xs text-slate-400">暂无场景数据</div>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
