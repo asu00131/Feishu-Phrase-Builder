@@ -57,14 +57,15 @@ export default function DashboardPage() {
   // 每个环节当前显示的话术索引（左侧流程）
   const [segmentIndices, setSegmentIndices] = React.useState<Record<string, number>>({})
 
-  // 动态字段映射辅助函数 - 增强识别能力
+  // 动态字段映射辅助函数
   const getFieldKey = React.useCallback((item: any, keywords: string[]) => {
     if (!item) return undefined
+    const keys = Object.keys(item).filter(k => k !== 'id')
     // 优先完全匹配
-    const exactMatch = Object.keys(item).find(k => keywords.some(kw => k === kw))
+    const exactMatch = keys.find(k => keywords.some(kw => k === kw))
     if (exactMatch) return exactMatch
     // 其次模糊匹配
-    return Object.keys(item).find(k => keywords.some(kw => k.includes(kw)))
+    return keys.find(k => keywords.some(kw => k.includes(kw)))
   }, [])
 
   const getField = React.useCallback((item: any, keywords: string[]) => {
@@ -72,46 +73,70 @@ export default function DashboardPage() {
     return key ? item[key] : null
   }, [getFieldKey])
 
+  // 计算属性：第一级过滤字段名称 (有场景则设为默认，否则选中第一个字段)
+  const primaryFilterKey = React.useMemo(() => {
+    if (data.length === 0) return null
+    const keys = Object.keys(data[0]).filter(k => k !== 'id')
+    // 强制匹配“场景”
+    const sceneKey = keys.find(k => k === '场景')
+    if (sceneKey) return sceneKey
+    // 尝试匹配相关关键字
+    const keywordMatch = keys.find(k => ['类别', '分类', '模块', '维度'].some(kw => k.includes(kw)))
+    // 兜底返回第一个有效列
+    return keywordMatch || keys[0]
+  }, [data])
+
+  // 计算属性：第二级过滤字段名称
+  const secondaryFilterKey = React.useMemo(() => {
+    if (data.length === 0 || !primaryFilterKey) return null
+    const keys = Object.keys(data[0]).filter(k => k !== 'id' && k !== primaryFilterKey)
+    // 尝试匹配相关关键字
+    const keywordMatch = keys.find(k => ['产品', '名称', '自动序号', '时间段', '短句话术'].some(kw => k.includes(kw)))
+    // 兜底返回第一个非主筛选列
+    return keywordMatch || keys[0]
+  }, [data, primaryFilterKey])
+
   // 初始化布局逻辑
   const initializeLayout = React.useCallback((result: TableData[]) => {
-    if (result.length > 0) {
-      const firstRow = result[0]
-      // 1. 尝试初始化场景
-      const sceneKey = getFieldKey(firstRow, ['场景', '类别', '分类', '模块'])
-      if (sceneKey) {
-        const scenes = Array.from(new Set(result.map(item => String(item[sceneKey])).filter(Boolean)))
-        const defaultScene = scenes.find(s => s.includes('灯饰介绍')) || scenes[0]
-        setSelectedScene(defaultScene)
+    if (result.length > 0 && primaryFilterKey) {
+      const scenes = Array.from(new Set(result.map(item => String(item[primaryFilterKey])).filter(Boolean)))
+      // 优先寻找“灯饰介绍”
+      const defaultScene = scenes.find(s => s.includes('灯饰介绍')) || scenes[0]
+      setSelectedScene(defaultScene)
 
-        // 2. 尝试初始化该场景下的第一个条目（如产品或序号）
-        const secondaryKey = getFieldKey(firstRow, ['产品', '名称', '自动序号', '时间段'])
-        if (secondaryKey) {
-          const items = result
-            .filter(item => String(item[sceneKey]) === defaultScene)
-            .map(item => String(item[secondaryKey]))
-            .filter(Boolean)
-          if (items.length > 0) {
-            setSelectedItem(items[0])
-          }
+      if (secondaryFilterKey) {
+        const items = result
+          .filter(item => String(item[primaryFilterKey]) === defaultScene)
+          .map(item => String(item[secondaryFilterKey]))
+          .filter(Boolean)
+        if (items.length > 0) {
+          setSelectedItem(items[0])
         }
       }
     }
-  }, [getFieldKey])
+  }, [primaryFilterKey, secondaryFilterKey])
 
   const loadData = React.useCallback(async (urlOverride?: string) => {
     setLoading(true)
     try {
       const result = await fetchFeishuData(urlOverride || csvUrl)
       setData(result)
-      initializeLayout(result)
+      // 需要在数据加载后，根据新识别的 Key 初始化
     } finally {
       setLoading(false)
     }
-  }, [csvUrl, initializeLayout])
+  }, [csvUrl])
 
   React.useEffect(() => {
     loadData()
   }, [loadData])
+
+  // 监听数据和字段识别变化来初始化
+  React.useEffect(() => {
+    if (data.length > 0 && primaryFilterKey) {
+      initializeLayout(data)
+    }
+  }, [data, primaryFilterKey, initializeLayout])
 
   const handleUrlUpdate = () => {
     setCsvUrl(tempUrl)
@@ -130,7 +155,6 @@ export default function DashboardPage() {
       try {
         const result = parseCSVContent(text)
         setData(result)
-        initializeLayout(result)
         setDialogOpen(false)
       } catch (err) {
         console.error("CSV 解析失败", err)
@@ -141,52 +165,42 @@ export default function DashboardPage() {
     reader.readAsText(file)
   }
 
-  // 计算属性：左侧策略环节 (按场景或模块分组)
+  // 计算属性：左侧策略环节
   const segments = React.useMemo(() => {
     const groups: Record<string, TableData[]> = {}
     data.forEach(item => {
-      const module = getField(item, ['场景', '模块', '环节', '阶段']) || '通用流程'
+      const module = getField(item, ['话术模块', '模块', '环节', '阶段']) || '通用流程'
       if (!groups[module]) groups[module] = []
       groups[module].push(item)
     })
     return groups
   }, [data, getField])
 
-  // 计算属性：所有可用场景
+  // 计算属性：第一级的所有可用选项
   const allScenes = React.useMemo(() => {
-    if (data.length === 0) return []
-    const key = getFieldKey(data[0], ['场景', '类别', '分类', '模块'])
-    if (!key) return []
-    return Array.from(new Set(data.map(item => String(item[key])).filter(Boolean)))
-  }, [data, getFieldKey])
+    if (data.length === 0 || !primaryFilterKey) return []
+    return Array.from(new Set(data.map(item => String(item[primaryFilterKey])).filter(Boolean)))
+  }, [data, primaryFilterKey])
 
-  // 计算属性：当前场景下的所有条目 (二级筛选)
+  // 计算属性：当前选定下的第二级选项
   const itemsInScene = React.useMemo(() => {
-    if (data.length === 0 || !selectedScene) return []
-    const sceneKey = getFieldKey(data[0], ['场景', '类别', '分类', '模块'])
-    const secondaryKey = getFieldKey(data[0], ['产品', '名称', '自动序号', '时间段', '短句话术'])
-    if (!sceneKey || !secondaryKey) return []
-    
+    if (data.length === 0 || !selectedScene || !primaryFilterKey || !secondaryFilterKey) return []
     return Array.from(new Set(
       data
-        .filter(item => String(item[sceneKey]) === selectedScene)
-        .map(item => String(item[secondaryKey]))
+        .filter(item => String(item[primaryFilterKey]) === selectedScene)
+        .map(item => String(item[secondaryFilterKey]))
         .filter(Boolean)
     ))
-  }, [data, selectedScene, getFieldKey])
+  }, [data, selectedScene, primaryFilterKey, secondaryFilterKey])
 
-  // 计算属性：选中的具体话术
+  // 计算属性：激活的话术
   const activeScript = React.useMemo(() => {
-    if (data.length === 0 || !selectedScene || !selectedItem) return null
-    const sceneKey = getFieldKey(data[0], ['场景', '类别', '分类', '模块'])
-    const secondaryKey = getFieldKey(data[0], ['产品', '名称', '自动序号', '时间段', '短句话术'])
-    if (!sceneKey || !secondaryKey) return null
-
+    if (data.length === 0 || !selectedScene || !selectedItem || !primaryFilterKey || !secondaryFilterKey) return null
     return data.find(item => 
-      String(item[sceneKey]) === selectedScene && 
-      String(item[secondaryKey]) === selectedItem
+      String(item[primaryFilterKey]) === selectedScene && 
+      String(item[secondaryFilterKey]) === selectedItem
     )
-  }, [data, selectedScene, selectedItem, getFieldKey])
+  }, [data, selectedScene, selectedItem, primaryFilterKey, secondaryFilterKey])
 
   const handleShuffle = (module: string) => {
     const count = segments[module]?.length || 0
@@ -198,16 +212,15 @@ export default function DashboardPage() {
   }
 
   const getContent = (item: any) => {
-    // 优先获取长段话术或政策口径
-    return getField(item, ['长段话术', '政策口径', '话术', '内容', '文本', '描述', '短句话术']) || "暂无话术内容"
+    return getField(item, ['长段话术', '政策口径', '话术', '内容', '文本', '描述']) || "暂无内容"
   }
 
   const handleSceneChange = (scene: string) => {
     setSelectedScene(scene)
-    const secondaryKey = getFieldKey(data[0], ['产品', '名称', '自动序号', '时间段', '短句话术'])
-    const sceneKey = getFieldKey(data[0], ['场景', '类别', '分类', '模块'])
-    const firstItem = data.find(item => String(item[sceneKey]) === scene)?.[secondaryKey!]
-    setSelectedItem(firstItem ? String(firstItem) : "")
+    if (primaryFilterKey && secondaryFilterKey) {
+      const firstItem = data.find(item => String(item[primaryFilterKey]) === scene)?.[secondaryFilterKey]
+      setSelectedItem(firstItem ? String(firstItem) : "")
+    }
   }
 
   return (
@@ -279,7 +292,7 @@ export default function DashboardPage() {
                   </div>
                   <div>
                     <h2 className="text-xl font-bold text-slate-800">策略流程话术</h2>
-                    <p className="text-xs text-slate-400 mt-0.5">多场景自动适配模板</p>
+                    <p className="text-xs text-slate-400 mt-0.5">根据话术模块自动分类</p>
                   </div>
                 </div>
                 <Button variant="ghost" size="sm" onClick={() => loadData()} className="text-primary font-bold">
@@ -328,7 +341,7 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 <div className="p-20 text-center bg-white rounded-[3rem] border-2 border-dashed border-slate-200 text-slate-400">
-                  <p>未检测到有效的流程数据</p>
+                  <p>未检测到话术模块数据</p>
                 </div>
               )}
             </div>
@@ -342,17 +355,19 @@ export default function DashboardPage() {
                   </div>
                   <div>
                     <h2 className="text-xl font-bold text-slate-800">核心展示筛选</h2>
-                    <p className="text-xs text-slate-400 mt-0.5">双级联动，精准定位话术</p>
+                    <p className="text-xs text-slate-400 mt-0.5">双级联动精准定位</p>
                   </div>
                 </div>
 
                 <div className="space-y-6">
-                  {/* 第一级：场景 */}
+                  {/* 第一级：主维度 */}
                   <div className="space-y-2.5">
-                    <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">直播场景 (第一级)</Label>
+                    <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                      {primaryFilterKey || '第一级筛选'}
+                    </Label>
                     <Select value={selectedScene} onValueChange={handleSceneChange}>
                       <SelectTrigger className="w-full h-11 rounded-xl border-slate-200 bg-white font-bold text-slate-700">
-                        <SelectValue placeholder="请选择场景" />
+                        <SelectValue placeholder="请选择内容" />
                       </SelectTrigger>
                       <SelectContent className="rounded-xl">
                         {allScenes.map(scene => (
@@ -364,9 +379,11 @@ export default function DashboardPage() {
                     </Select>
                   </div>
 
-                  {/* 第二级：具体产品/条目 */}
+                  {/* 第二级：次维度 */}
                   <div className="space-y-2.5">
-                    <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">具体条目 (第二级)</Label>
+                    <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                      {secondaryFilterKey || '第二级筛选'}
+                    </Label>
                     <Select value={selectedItem} onValueChange={setSelectedItem}>
                       <SelectTrigger className="w-full h-11 rounded-xl border-slate-200 bg-white font-bold text-slate-700">
                         <SelectValue placeholder="请选择具体条目" />
@@ -401,14 +418,14 @@ export default function DashboardPage() {
                   <div className="text-slate-700 leading-relaxed text-xl font-semibold whitespace-pre-wrap">
                     {activeScript ? (
                       <div className="space-y-6">
-                        {/* 如果存在短句话术，展示为引子 */}
-                        {getField(activeScript, ['短句话术']) && (
+                        {/* 展示短句话术或时间段信息 */}
+                        {(getField(activeScript, ['短句话术']) || getField(activeScript, ['时间段'])) && (
                           <div className="bg-slate-50 p-4 rounded-2xl text-base text-slate-500 border-l-4 border-primary/30">
-                            引子：{getField(activeScript, ['短句话术'])}
+                            {getField(activeScript, ['短句话术']) || `当前时段: ${getField(activeScript, ['时间段'])}`}
                           </div>
                         )}
                         <div>{getContent(activeScript)}</div>
-                        {/* 如果存在政策口径，展示在底部 */}
+                        {/* 政策口径展示 */}
                         {getField(activeScript, ['政策口径']) && (
                           <div className="mt-8 pt-6 border-t border-dashed text-sm text-emerald-600 font-bold flex items-start gap-2">
                             <Sparkles className="h-4 w-4 mt-1 shrink-0" />
@@ -419,7 +436,7 @@ export default function DashboardPage() {
                     ) : (
                       <div className="flex flex-col items-center justify-center h-full pt-20 text-slate-300">
                         <ShoppingBag className="h-16 w-16 mb-4 opacity-10" />
-                        <p className="text-sm">请选择场景和条目以查看话术</p>
+                        <p className="text-sm">请选择对应项以查看话术</p>
                       </div>
                     )}
                   </div>
