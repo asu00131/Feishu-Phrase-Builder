@@ -1,15 +1,11 @@
-
 "use client"
 
 import * as React from "react"
 import { fetchFeishuData } from "@/lib/mock-data"
 import { TableData } from "@/lib/types"
 import { 
-  Settings, 
   RefreshCcw, 
   Sparkles,
-  Volume2,
-  ChevronRight,
   RotateCcw,
   Layers,
   ShoppingBag
@@ -271,9 +267,6 @@ export default function DashboardPage() {
                   <Badge className="bg-emerald-500 text-white border-none px-4 py-1 rounded-full font-bold shadow-sm shadow-emerald-200">
                     核心卖点话术
                   </Badge>
-                  <Button variant="outline" size="sm" className="rounded-full text-xs font-bold gap-2 border-slate-200 bg-white/50 backdrop-blur-sm">
-                    <Volume2 className="h-4 w-4 text-emerald-600" /> 模拟试听
-                  </Button>
                 </div>
 
                 <div className="space-y-6 relative">
