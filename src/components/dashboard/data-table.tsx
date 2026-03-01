@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -25,7 +26,8 @@ import {
   Filter,
   MoreHorizontal,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Download
 } from "lucide-react"
 import { TableData, SortConfig } from "@/lib/types"
 import { Badge } from "@/components/ui/badge"
@@ -39,7 +41,7 @@ export function DataTable({ data }: DataTableProps) {
   const [searchTerm, setSearchTerm] = React.useState("")
   const [sortConfig, setSortConfig] = React.useState<SortConfig>({ key: null, direction: null })
   const [currentPage, setCurrentPage] = React.useState(1)
-  const itemsPerPage = 5
+  const itemsPerPage = 8
 
   const handleSort = (key: keyof TableData) => {
     let direction: 'asc' | 'desc' | null = 'asc'
@@ -54,7 +56,7 @@ export function DataTable({ data }: DataTableProps) {
   const filteredData = React.useMemo(() => {
     return data.filter((item) =>
       Object.values(item).some((val) =>
-        val.toString().toLowerCase().includes(searchTerm.toLowerCase())
+        val?.toString().toLowerCase().includes(searchTerm.toLowerCase())
       )
     )
   }, [data, searchTerm])
@@ -62,9 +64,18 @@ export function DataTable({ data }: DataTableProps) {
   const sortedData = React.useMemo(() => {
     if (!sortConfig.key || !sortConfig.direction) return filteredData
 
+    const priorityOrder = { '高': 3, '中': 2, '低': 1 }
+
     return [...filteredData].sort((a, b) => {
-      const aValue = a[sortConfig.key!]
-      const bValue = b[sortConfig.key!]
+      let aValue = a[sortConfig.key!]
+      let bValue = b[sortConfig.key!]
+
+      // 特殊处理优先级排序
+      if (sortConfig.key === 'priority') {
+        const aPrio = priorityOrder[a.priority as keyof typeof priorityOrder] || 0
+        const bPrio = priorityOrder[b.priority as keyof typeof priorityOrder] || 0
+        return sortConfig.direction === 'asc' ? aPrio - bPrio : bPrio - aPrio
+      }
 
       if (aValue < bValue) {
         return sortConfig.direction === 'asc' ? -1 : 1
@@ -114,59 +125,59 @@ export function DataTable({ data }: DataTableProps) {
               setSearchTerm(e.target.value)
               setCurrentPage(1)
             }}
-            className="pl-9 bg-white"
+            className="pl-9 bg-white border-slate-200 focus:ring-primary/20"
           />
         </div>
         <div className="flex items-center gap-2">
-           <Button variant="outline" size="sm" className="hidden md:flex gap-2">
+           <Button variant="outline" size="sm" className="flex gap-2 text-slate-600 border-slate-200">
              <Filter className="h-4 w-4" /> 筛选
            </Button>
-           <Button variant="outline" size="sm" className="hidden md:flex gap-2">
-             导出
+           <Button variant="outline" size="sm" className="flex gap-2 text-slate-600 border-slate-200">
+             <Download className="h-4 w-4" /> 导出
            </Button>
         </div>
       </div>
 
-      <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
         <Table>
-          <TableHeader className="bg-slate-50/50">
-            <TableRow>
-              <TableHead className="w-[250px]">
+          <TableHeader className="bg-slate-50/80">
+            <TableRow className="border-slate-200">
+              <TableHead className="w-[300px]">
                 <button
                   onClick={() => handleSort('projectName')}
-                  className="flex items-center gap-1 hover:text-primary transition-colors"
+                  className="flex items-center gap-1 hover:text-primary transition-colors font-semibold"
                 >
                   项目名称
                   <ArrowUpDown className="h-3 w-3" />
                 </button>
               </TableHead>
-              <TableHead>负责人</TableHead>
-              <TableHead>状态</TableHead>
+              <TableHead className="font-semibold">负责人</TableHead>
+              <TableHead className="font-semibold">状态</TableHead>
               <TableHead>
                  <button
                   onClick={() => handleSort('priority')}
-                  className="flex items-center gap-1 hover:text-primary transition-colors"
+                  className="flex items-center gap-1 hover:text-primary transition-colors font-semibold"
                 >
                   优先级
                   <ArrowUpDown className="h-3 w-3" />
                 </button>
               </TableHead>
-              <TableHead className="min-w-[150px]">进度</TableHead>
-              <TableHead className="text-right">截止日期</TableHead>
+              <TableHead className="min-w-[150px] font-semibold text-center">进度</TableHead>
+              <TableHead className="text-right font-semibold">截止日期</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {paginatedData.length > 0 ? (
               paginatedData.map((row) => (
-                <TableRow key={row.id} className="hover:bg-slate-50/50 transition-colors">
-                  <TableCell className="font-medium text-slate-900">{row.projectName}</TableCell>
-                  <TableCell>{row.owner}</TableCell>
+                <TableRow key={row.id} className="hover:bg-slate-50/50 transition-colors border-slate-100">
+                  <TableCell className="font-medium text-slate-900 py-4">{row.projectName}</TableCell>
+                  <TableCell className="text-slate-600">{row.owner}</TableCell>
                   <TableCell>{getStatusBadge(row.status)}</TableCell>
                   <TableCell>{getPriorityBadge(row.priority)}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      <Progress value={row.progress} className="h-2 w-full" />
-                      <span className="text-xs text-muted-foreground w-8">{row.progress}%</span>
+                      <Progress value={row.progress} className="h-2 flex-1" />
+                      <span className="text-xs font-medium text-slate-500 w-9 text-right">{row.progress}%</span>
                     </div>
                   </TableCell>
                   <TableCell className="text-right text-slate-500 font-mono text-xs">{row.endDate}</TableCell>
@@ -174,7 +185,7 @@ export function DataTable({ data }: DataTableProps) {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={6} className="h-48 text-center text-muted-foreground">
+                <TableCell colSpan={6} className="h-48 text-center text-muted-foreground bg-slate-50/30">
                    未找到匹配的数据
                 </TableCell>
               </TableRow>
@@ -184,25 +195,26 @@ export function DataTable({ data }: DataTableProps) {
       </div>
 
       <div className="flex items-center justify-between py-4 px-2">
-        <div className="text-sm text-muted-foreground">
-          显示 {sortedData.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0} 至 {Math.min(currentPage * itemsPerPage, sortedData.length)} 项，共 {sortedData.length} 项
+        <div className="text-sm text-slate-500">
+          共 <span className="font-semibold text-slate-900">{sortedData.length}</span> 项项目
         </div>
         <div className="flex items-center space-x-2">
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
             onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
             disabled={currentPage === 1}
+            className="text-slate-600"
           >
-            <ChevronLeft className="h-4 w-4 mr-1" /> 上一页
+            <ChevronLeft className="h-4 w-4 mr-1" />
           </Button>
           <div className="flex items-center gap-1">
              {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
                <Button
                 key={page}
-                variant={currentPage === page ? "default" : "outline"}
+                variant={currentPage === page ? "default" : "ghost"}
                 size="sm"
-                className="w-8 h-8 p-0"
+                className={`w-8 h-8 p-0 ${currentPage === page ? 'bg-primary text-white shadow-md' : 'text-slate-600'}`}
                 onClick={() => setCurrentPage(page)}
                >
                  {page}
@@ -210,12 +222,13 @@ export function DataTable({ data }: DataTableProps) {
              ))}
           </div>
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
             onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
             disabled={currentPage === totalPages || totalPages === 0}
+            className="text-slate-600"
           >
-            下一页 <ChevronRight className="h-4 w-4 ml-1" />
+            <ChevronRight className="h-4 w-4 ml-1" />
           </Button>
         </div>
       </div>

@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -5,18 +6,20 @@ import { DataTable } from "@/components/dashboard/data-table"
 import { AIInsight } from "@/components/dashboard/ai-insight"
 import { fetchFeishuData } from "@/lib/mock-data"
 import { TableData } from "@/lib/types"
-import { LayoutDashboard, Database, RefreshCcw, ExternalLink } from "lucide-react"
+import { LayoutDashboard, Database, RefreshCcw, ExternalLink, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 export default function DashboardPage() {
   const [data, setData] = React.useState<TableData[]>([])
   const [loading, setLoading] = React.useState(true)
+  const [lastUpdated, setLastUpdated] = React.useState<string | null>(null)
 
   const loadData = React.useCallback(async () => {
     setLoading(true)
     try {
       const result = await fetchFeishuData()
       setData(result)
+      setLastUpdated(new Date().toLocaleTimeString())
     } finally {
       setLoading(false)
     }
@@ -27,28 +30,42 @@ export default function DashboardPage() {
   }, [loadData])
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen bg-[#F8FAFC]">
       {/* Header */}
       <header className="sticky top-0 z-40 w-full border-b bg-white/80 backdrop-blur-md">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="bg-primary p-1.5 rounded-lg shadow-md shadow-primary/20">
+          <div className="flex items-center gap-3">
+            <div className="bg-primary p-2 rounded-xl shadow-lg shadow-primary/20">
                <LayoutDashboard className="h-5 w-5 text-white" />
             </div>
-            <h1 className="text-xl font-bold tracking-tight text-slate-900">数据看板</h1>
+            <div>
+              <h1 className="text-lg font-bold tracking-tight text-slate-900 leading-none">数据看板</h1>
+              <div className="flex items-center gap-1.5 mt-1">
+                <div className={`h-1.5 w-1.5 rounded-full ${loading ? 'bg-amber-400 animate-pulse' : 'bg-emerald-500'}`} />
+                <span className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">
+                  {loading ? '正在同步' : '已连接'}
+                </span>
+              </div>
+            </div>
           </div>
           
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
+            {lastUpdated && !loading && (
+              <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-400 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-100">
+                <Clock className="h-3 w-3" />
+                最后更新: {lastUpdated}
+              </div>
+            )}
             <a 
               href="https://bea9ijqf1k.feishu.cn/wiki/US1ewpweWiIHc0kLYR1cL8vQnOf" 
               target="_blank" 
-              className="hidden md:flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors"
+              className="hidden md:flex items-center gap-1.5 text-xs text-slate-500 hover:text-primary transition-colors font-medium"
             >
-              <ExternalLink className="h-3 w-3" />
-              查看飞书原始数据
+              <ExternalLink className="h-3.5 w-3.5" />
+              飞书 Wiki 原始数据
             </a>
-            <Button variant="ghost" size="icon" onClick={loadData} disabled={loading} className="rounded-full">
-              <RefreshCcw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            <Button variant="ghost" size="icon" onClick={loadData} disabled={loading} className="rounded-full hover:bg-slate-100">
+              <RefreshCcw className={`h-4 w-4 text-slate-600 ${loading ? 'animate-spin' : ''}`} />
             </Button>
           </div>
         </div>
@@ -56,15 +73,15 @@ export default function DashboardPage() {
 
       {/* Main Content */}
       <main className="flex-1 container mx-auto px-4 py-8">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
+        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-10">
           <div>
-            <div className="flex items-center gap-2 text-primary font-medium mb-1">
+            <div className="flex items-center gap-2 text-primary font-bold text-sm mb-2 uppercase tracking-widest">
               <Database className="h-4 w-4" />
-              <span>项目进度追踪</span>
+              <span>Project Insights</span>
             </div>
-            <h2 className="text-3xl font-bold text-slate-900">实时数据概览</h2>
-            <p className="text-muted-foreground mt-2 max-w-2xl">
-              此看板实时同步自飞书 Wiki 数据库，展示了当前所有进行中的核心项目状态。支持多维度筛选与智能 AI 洞察分析。
+            <h2 className="text-4xl font-extrabold text-slate-900 tracking-tight">项目执行概览</h2>
+            <p className="text-slate-500 mt-3 max-w-2xl text-lg leading-relaxed">
+              实时同步飞书 Wiki 核心业务数据。利用 AI 技术深度分析项目健康度、资源瓶颈与进度预期，辅助高效决策。
             </p>
           </div>
 
@@ -74,23 +91,36 @@ export default function DashboardPage() {
         </div>
 
         {loading ? (
-          <div className="w-full h-96 flex flex-col items-center justify-center space-y-4 bg-white/50 border rounded-2xl animate-pulse">
-            <div className="w-12 h-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
-            <p className="text-slate-500 font-medium">正在拉取最新数据...</p>
+          <div className="w-full h-[500px] flex flex-col items-center justify-center space-y-6 bg-white/60 border border-slate-200 border-dashed rounded-3xl animate-pulse">
+            <div className="relative">
+              <div className="w-16 h-16 rounded-full border-4 border-primary/10 border-t-primary animate-spin" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                 <RefreshCcw className="h-6 w-6 text-primary/40" />
+              </div>
+            </div>
+            <div className="text-center">
+              <p className="text-slate-900 font-bold text-xl">数据同步中...</p>
+              <p className="text-slate-500 mt-1">正在安全连接至飞书开放平台</p>
+            </div>
           </div>
         ) : (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="animate-in fade-in slide-in-from-bottom-6 duration-700">
              <DataTable data={data} />
           </div>
         )}
       </main>
 
       {/* Footer */}
-      <footer className="border-t bg-white py-6">
-        <div className="container mx-auto px-4 text-center">
-           <p className="text-sm text-muted-foreground">
-             &copy; 2024 数据看板 · 基于 Feishu API 提供动力 · 智能 AI 驱动
+      <footer className="border-t bg-white py-8">
+        <div className="container mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-4">
+           <p className="text-sm text-slate-400 font-medium">
+             &copy; 2024 Intelligent Dashboard · Powered by Feishu Open API
            </p>
+           <div className="flex items-center gap-6 text-xs text-slate-400 font-medium">
+             <span className="hover:text-primary cursor-pointer transition-colors">隐私政策</span>
+             <span className="hover:text-primary cursor-pointer transition-colors">使用条款</span>
+             <span className="hover:text-primary cursor-pointer transition-colors">技术支持</span>
+           </div>
         </div>
       </footer>
     </div>
