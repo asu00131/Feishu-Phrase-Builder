@@ -22,7 +22,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = React.useState(true)
   const [activeTab, setActiveTab] = React.useState("preview")
   
-  // 选中的产品分类
+  // 选中的产品分类/场景
   const [selectedCategory, setSelectedCategory] = React.useState<string>("")
   // 每个环节当前显示的话术索引
   const [segmentIndices, setSegmentIndices] = React.useState<Record<string, number>>({})
@@ -33,12 +33,16 @@ export default function DashboardPage() {
       const result = await fetchFeishuData()
       setData(result)
       if (result.length > 0) {
-        // 自动识别分类字段并设置初始选中
-        const firstItem = result[0]
-        const catKey = Object.keys(firstItem).find(k => k.includes('分类') || k.includes('产品') || k.includes('名称'))
+        // 自动识别分类/场景字段并设置初始选中
+        const catKey = Object.keys(result[0]).find(k => k.includes('场景') || k.includes('分类') || k.includes('产品') || k.includes('名称'))
         if (catKey) {
           const categories = Array.from(new Set(result.map(item => item[catKey]).filter(Boolean)))
-          if (categories.length > 0) setSelectedCategory(categories[0] as string)
+          // 默认展示条件：场景 = 灯饰介绍
+          if (categories.includes('灯饰介绍')) {
+            setSelectedCategory('灯饰介绍')
+          } else if (categories.length > 0) {
+            setSelectedCategory(categories[0] as string)
+          }
         }
       }
     } finally {
@@ -67,16 +71,16 @@ export default function DashboardPage() {
     return groups
   }, [data])
 
-  // 所有分类（右侧标签）
+  // 所有分类/场景（右侧标签）
   const allCategories = React.useMemo(() => {
-    const key = data.length > 0 ? Object.keys(data[0]).find(k => k.includes('分类') || k.includes('产品') || k.includes('类别')) : null
+    const key = data.length > 0 ? Object.keys(data[0]).find(k => k.includes('场景') || k.includes('分类') || k.includes('产品') || k.includes('类别')) : null
     if (!key) return []
     return Array.from(new Set(data.map(item => item[key]).filter(Boolean)))
   }, [data])
 
-  // 当前分类下的话术
+  // 当前选中分类/场景下的话术
   const categoryScripts = React.useMemo(() => {
-    const key = data.length > 0 ? Object.keys(data[0]).find(k => k.includes('分类') || k.includes('产品') || k.includes('类别')) : null
+    const key = data.length > 0 ? Object.keys(data[0]).find(k => k.includes('场景') || k.includes('分类') || k.includes('产品') || k.includes('类别')) : null
     if (!key || !selectedCategory) return []
     return data.filter(item => item[key] === selectedCategory)
   }, [data, selectedCategory])
@@ -226,7 +230,7 @@ export default function DashboardPage() {
 
             {/* 右列：产品核心 (5/12) */}
             <div className="col-span-12 lg:col-span-5 space-y-8">
-              {/* 产品分类选择 */}
+              {/* 产品/场景分类选择 */}
               <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100">
                 <div className="flex items-center gap-3 mb-8">
                   <div className="bg-emerald-100 p-2 rounded-xl">
@@ -234,7 +238,7 @@ export default function DashboardPage() {
                   </div>
                   <div>
                     <h2 className="text-xl font-bold text-slate-800">产品核心展示</h2>
-                    <p className="text-xs text-slate-400 mt-0.5">选择分类快速查看对应带货话术</p>
+                    <p className="text-xs text-slate-400 mt-0.5">选择分类/场景快速查看对应话术</p>
                   </div>
                 </div>
 
@@ -259,7 +263,7 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* 选中产品的话术详情卡片 */}
+              {/* 选中产品/场景的话术详情卡片 */}
               <div className="bg-white rounded-[3rem] p-10 shadow-xl shadow-slate-200/40 border border-slate-100 relative overflow-hidden group min-h-[500px]">
                 <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-50 rounded-full -mr-24 -mt-24 transition-transform group-hover:scale-110" />
                 
