@@ -1,4 +1,3 @@
-
 "use client"
 
 import * as React from "react"
@@ -12,26 +11,16 @@ import {
 } from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { 
-  ChevronDown, 
-  ChevronUp, 
   Search, 
   ArrowUpDown,
   Filter,
-  MoreHorizontal,
   ChevronLeft,
   ChevronRight,
   Download
 } from "lucide-react"
 import { TableData, SortConfig } from "@/lib/types"
 import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
 
 interface DataTableProps {
   data: TableData[]
@@ -41,9 +30,15 @@ export function DataTable({ data }: DataTableProps) {
   const [searchTerm, setSearchTerm] = React.useState("")
   const [sortConfig, setSortConfig] = React.useState<SortConfig>({ key: null, direction: null })
   const [currentPage, setCurrentPage] = React.useState(1)
-  const itemsPerPage = 8
+  const itemsPerPage = 10
 
-  const handleSort = (key: keyof TableData) => {
+  // 动态获取表头（排除 id）
+  const headers = React.useMemo(() => {
+    if (data.length === 0) return []
+    return Object.keys(data[0]).filter(key => key !== 'id')
+  }, [data])
+
+  const handleSort = (key: string) => {
     let direction: 'asc' | 'desc' | null = 'asc'
     if (sortConfig.key === key && sortConfig.direction === 'asc') {
       direction = 'desc'
@@ -64,18 +59,9 @@ export function DataTable({ data }: DataTableProps) {
   const sortedData = React.useMemo(() => {
     if (!sortConfig.key || !sortConfig.direction) return filteredData
 
-    const priorityOrder = { '高': 3, '中': 2, '低': 1 }
-
     return [...filteredData].sort((a, b) => {
-      let aValue = a[sortConfig.key!]
-      let bValue = b[sortConfig.key!]
-
-      // 特殊处理优先级排序
-      if (sortConfig.key === 'priority') {
-        const aPrio = priorityOrder[a.priority as keyof typeof priorityOrder] || 0
-        const bPrio = priorityOrder[b.priority as keyof typeof priorityOrder] || 0
-        return sortConfig.direction === 'asc' ? aPrio - bPrio : bPrio - aPrio
-      }
+      const aValue = a[sortConfig.key!] || ""
+      const bValue = b[sortConfig.key!] || ""
 
       if (aValue < bValue) {
         return sortConfig.direction === 'asc' ? -1 : 1
@@ -94,23 +80,17 @@ export function DataTable({ data }: DataTableProps) {
 
   const totalPages = Math.ceil(sortedData.length / itemsPerPage)
 
-  const getStatusBadge = (status: TableData['status']) => {
-    const variants: Record<string, string> = {
-      '进行中': 'bg-blue-100 text-blue-800 border-blue-200',
-      '已完成': 'bg-emerald-100 text-emerald-800 border-emerald-200',
-      '未开始': 'bg-slate-100 text-slate-800 border-slate-200',
-      '延迟': 'bg-rose-100 text-rose-800 border-rose-200',
+  const renderCellContent = (key: string, value: any) => {
+    // 针对“状态”列的特殊渲染
+    if (key.includes('状态') || key.includes('Status')) {
+      const variants: Record<string, string> = {
+        '启用': 'bg-emerald-100 text-emerald-800 border-emerald-200',
+        '停用': 'bg-rose-100 text-rose-800 border-rose-200',
+        '进行中': 'bg-blue-100 text-blue-800 border-blue-200',
+      }
+      return <Badge className={`${variants[value] || 'bg-slate-100'} font-normal border shadow-none`}>{value}</Badge>
     }
-    return <Badge className={`${variants[status] || ''} font-normal border shadow-none`}>{status}</Badge>
-  }
-
-  const getPriorityBadge = (priority: TableData['priority']) => {
-    const variants: Record<string, string> = {
-      '高': 'text-rose-500',
-      '中': 'text-amber-500',
-      '低': 'text-slate-400',
-    }
-    return <span className={`${variants[priority]} font-semibold`}>● {priority}</span>
+    return <span className="text-slate-600 line-clamp-2">{value}</span>
   }
 
   return (
@@ -119,7 +99,7 @@ export function DataTable({ data }: DataTableProps) {
         <div className="relative w-full sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="搜索项目、负责人..."
+            placeholder="在数据表中搜索..."
             value={searchTerm}
             onChange={(e) => {
               setSearchTerm(e.target.value)
@@ -133,7 +113,7 @@ export function DataTable({ data }: DataTableProps) {
              <Filter className="h-4 w-4" /> 筛选
            </Button>
            <Button variant="outline" size="sm" className="flex gap-2 text-slate-600 border-slate-200">
-             <Download className="h-4 w-4" /> 导出
+             <Download className="h-4 w-4" /> 导出 CSV
            </Button>
         </div>
       </div>
@@ -142,50 +122,33 @@ export function DataTable({ data }: DataTableProps) {
         <Table>
           <TableHeader className="bg-slate-50/80">
             <TableRow className="border-slate-200">
-              <TableHead className="w-[300px]">
-                <button
-                  onClick={() => handleSort('projectName')}
-                  className="flex items-center gap-1 hover:text-primary transition-colors font-semibold"
-                >
-                  项目名称
-                  <ArrowUpDown className="h-3 w-3" />
-                </button>
-              </TableHead>
-              <TableHead className="font-semibold">负责人</TableHead>
-              <TableHead className="font-semibold">状态</TableHead>
-              <TableHead>
-                 <button
-                  onClick={() => handleSort('priority')}
-                  className="flex items-center gap-1 hover:text-primary transition-colors font-semibold"
-                >
-                  优先级
-                  <ArrowUpDown className="h-3 w-3" />
-                </button>
-              </TableHead>
-              <TableHead className="min-w-[150px] font-semibold text-center">进度</TableHead>
-              <TableHead className="text-right font-semibold">截止日期</TableHead>
+              {headers.map((header) => (
+                <TableHead key={header} className="font-semibold whitespace-nowrap">
+                  <button
+                    onClick={() => handleSort(header)}
+                    className="flex items-center gap-1 hover:text-primary transition-colors"
+                  >
+                    {header}
+                    <ArrowUpDown className="h-3 w-3" />
+                  </button>
+                </TableHead>
+              ))}
             </TableRow>
           </TableHeader>
           <TableBody>
             {paginatedData.length > 0 ? (
               paginatedData.map((row) => (
                 <TableRow key={row.id} className="hover:bg-slate-50/50 transition-colors border-slate-100">
-                  <TableCell className="font-medium text-slate-900 py-4">{row.projectName}</TableCell>
-                  <TableCell className="text-slate-600">{row.owner}</TableCell>
-                  <TableCell>{getStatusBadge(row.status)}</TableCell>
-                  <TableCell>{getPriorityBadge(row.priority)}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Progress value={row.progress} className="h-2 flex-1" />
-                      <span className="text-xs font-medium text-slate-500 w-9 text-right">{row.progress}%</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right text-slate-500 font-mono text-xs">{row.endDate}</TableCell>
+                  {headers.map((header) => (
+                    <TableCell key={header} className="py-4">
+                      {renderCellContent(header, row[header])}
+                    </TableCell>
+                  ))}
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={6} className="h-48 text-center text-muted-foreground bg-slate-50/30">
+                <TableCell colSpan={headers.length} className="h-48 text-center text-muted-foreground bg-slate-50/30">
                    未找到匹配的数据
                 </TableCell>
               </TableRow>
@@ -196,7 +159,7 @@ export function DataTable({ data }: DataTableProps) {
 
       <div className="flex items-center justify-between py-4 px-2">
         <div className="text-sm text-slate-500">
-          共 <span className="font-semibold text-slate-900">{sortedData.length}</span> 项项目
+          共 <span className="font-semibold text-slate-900">{sortedData.length}</span> 条记录
         </div>
         <div className="flex items-center space-x-2">
           <Button
@@ -208,18 +171,8 @@ export function DataTable({ data }: DataTableProps) {
           >
             <ChevronLeft className="h-4 w-4 mr-1" />
           </Button>
-          <div className="flex items-center gap-1">
-             {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-               <Button
-                key={page}
-                variant={currentPage === page ? "default" : "ghost"}
-                size="sm"
-                className={`w-8 h-8 p-0 ${currentPage === page ? 'bg-primary text-white shadow-md' : 'text-slate-600'}`}
-                onClick={() => setCurrentPage(page)}
-               >
-                 {page}
-               </Button>
-             ))}
+          <div className="text-sm font-medium text-slate-600">
+            第 {currentPage} 页 / 共 {totalPages || 1} 页
           </div>
           <Button
             variant="ghost"

@@ -1,110 +1,50 @@
-
 import { TableData } from './types';
 
 export async function fetchFeishuData(): Promise<TableData[]> {
-  // 模拟网络延迟，让用户感觉到是在“拉取”数据
-  await new Promise(resolve => setTimeout(resolve, 1000));
+  const url = 'https://raw.githubusercontent.com/asu00131/Feishu-Phrase-Builder/refs/heads/main/src/app/%E7%9B%B4%E6%92%AD%E8%AF%9D%E6%9C%AF_%E6%95%B0%E6%8D%AE%E8%A1%A8.csv';
+  
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Failed to fetch CSV');
+    const text = await response.text();
+    
+    // 简单的 CSV 解析器，处理引号中的逗号
+    const parseCSVLine = (line: string) => {
+      const result = [];
+      let cur = '';
+      let inQuote = false;
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"') {
+          inQuote = !inQuote;
+        } else if (char === ',' && !inQuote) {
+          result.push(cur.trim().replace(/^"|"$/g, ''));
+          cur = '';
+        } else {
+          cur += char;
+        }
+      }
+      result.push(cur.trim().replace(/^"|"$/g, ''));
+      return result;
+    };
 
-  return [
-    {
-      id: '1',
-      projectName: '企业官网 2.0 智能升级',
-      status: '进行中',
-      owner: '张伟',
-      startDate: '2024-03-01',
-      endDate: '2024-05-15',
-      priority: '高',
-      progress: 45,
-    },
-    {
-      id: '2',
-      projectName: 'CRM 系统数据安全迁移',
-      status: '已完成',
-      owner: '李芳',
-      startDate: '2024-01-10',
-      endDate: '2024-02-28',
-      priority: '中',
-      progress: 100,
-    },
-    {
-      id: '3',
-      projectName: 'Q2 市场营销深度分析报告',
-      status: '未开始',
-      owner: '王明',
-      startDate: '2024-04-01',
-      endDate: '2024-04-10',
-      priority: '低',
-      progress: 0,
-    },
-    {
-      id: '4',
-      projectName: '移动端 App 交互体验优化',
-      status: '延迟',
-      owner: '赵雷',
-      startDate: '2024-02-15',
-      endDate: '2024-03-20',
-      priority: '高',
-      progress: 75,
-    },
-    {
-      id: '5',
-      projectName: '2024 新员工入职赋能手册',
-      status: '进行中',
-      owner: '孙悦',
-      startDate: '2024-03-10',
-      endDate: '2024-04-30',
-      priority: '中',
-      progress: 60,
-    },
-    {
-      id: '6',
-      projectName: '全球供应链管理系统 V3.0',
-      status: '进行中',
-      owner: '周洋',
-      startDate: '2024-02-01',
-      endDate: '2024-12-30',
-      priority: '高',
-      progress: 32,
-    },
-    {
-      id: '7',
-      projectName: '年度财务合规性审计',
-      status: '未开始',
-      owner: '吴梅',
-      startDate: '2024-05-01',
-      endDate: '2024-06-15',
-      priority: '高',
-      progress: 0,
-    },
-    {
-      id: '8',
-      projectName: '核心客户年度满意度调研',
-      status: '已完成',
-      owner: '郑洁',
-      startDate: '2024-01-01',
-      endDate: '2024-01-20',
-      priority: '中',
-      progress: 100,
-    },
-    {
-      id: '9',
-      projectName: 'AI 自动代码审查工具集成',
-      status: '进行中',
-      owner: '陈诚',
-      startDate: '2024-03-15',
-      endDate: '2024-06-30',
-      priority: '高',
-      progress: 20,
-    },
-    {
-      id: '10',
-      projectName: '办公场地智能化改造工程',
-      status: '延迟',
-      owner: '林峰',
-      startDate: '2024-01-20',
-      endDate: '2024-03-10',
-      priority: '低',
-      progress: 85,
-    },
-  ];
+    const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
+    if (lines.length < 2) return [];
+
+    const headers = parseCSVLine(lines[0]);
+    
+    return lines.slice(1).map((line, idx) => {
+      const values = parseCSVLine(line);
+      const obj: TableData = { id: idx.toString() };
+      headers.forEach((header, i) => {
+        if (header) {
+          obj[header] = values[i] || '';
+        }
+      });
+      return obj;
+    });
+  } catch (error) {
+    console.error('Error loading CSV data:', error);
+    return [];
+  }
 }

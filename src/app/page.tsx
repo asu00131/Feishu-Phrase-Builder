@@ -1,4 +1,3 @@
-
 "use client"
 
 import * as React from "react"
@@ -39,11 +38,11 @@ export default function DashboardPage() {
                <LayoutDashboard className="h-5 w-5 text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-bold tracking-tight text-slate-900 leading-none">数据看板</h1>
+              <h1 className="text-lg font-bold tracking-tight text-slate-900 leading-none">直播话术库</h1>
               <div className="flex items-center gap-1.5 mt-1">
                 <div className={`h-1.5 w-1.5 rounded-full ${loading ? 'bg-amber-400 animate-pulse' : 'bg-emerald-500'}`} />
                 <span className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">
-                  {loading ? '正在同步' : '已连接'}
+                  {loading ? '正在同步' : '实时在线'}
                 </span>
               </div>
             </div>
@@ -57,12 +56,12 @@ export default function DashboardPage() {
               </div>
             )}
             <a 
-              href="https://bea9ijqf1k.feishu.cn/wiki/US1ewpweWiIHc0kLYR1cL8vQnOf" 
+              href="https://github.com/asu00131/Feishu-Phrase-Builder" 
               target="_blank" 
               className="hidden md:flex items-center gap-1.5 text-xs text-slate-500 hover:text-primary transition-colors font-medium"
             >
               <ExternalLink className="h-3.5 w-3.5" />
-              飞书 Wiki 原始数据
+              查看 GitHub 源码
             </a>
             <Button variant="ghost" size="icon" onClick={loadData} disabled={loading} className="rounded-full hover:bg-slate-100">
               <RefreshCcw className={`h-4 w-4 text-slate-600 ${loading ? 'animate-spin' : ''}`} />
@@ -77,16 +76,16 @@ export default function DashboardPage() {
           <div>
             <div className="flex items-center gap-2 text-primary font-bold text-sm mb-2 uppercase tracking-widest">
               <Database className="h-4 w-4" />
-              <span>Project Insights</span>
+              <span>Streaming Assets</span>
             </div>
-            <h2 className="text-4xl font-extrabold text-slate-900 tracking-tight">项目执行概览</h2>
+            <h2 className="text-4xl font-extrabold text-slate-900 tracking-tight">直播话术内容管理</h2>
             <p className="text-slate-500 mt-3 max-w-2xl text-lg leading-relaxed">
-              实时同步飞书 Wiki 核心业务数据。利用 AI 技术深度分析项目健康度、资源瓶颈与进度预期，辅助高效决策。
+              当前数据已连接至 GitHub 原始 CSV 表。您可以实时查看直播话术的分类、内容及负责人信息。
             </p>
           </div>
 
           <div className="shrink-0">
-             {!loading && <AIInsight currentData={data} />}
+             {!loading && data.length > 0 && <AIInsight currentData={data} />}
           </div>
         </div>
 
@@ -94,13 +93,10 @@ export default function DashboardPage() {
           <div className="w-full h-[500px] flex flex-col items-center justify-center space-y-6 bg-white/60 border border-slate-200 border-dashed rounded-3xl animate-pulse">
             <div className="relative">
               <div className="w-16 h-16 rounded-full border-4 border-primary/10 border-t-primary animate-spin" />
-              <div className="absolute inset-0 flex items-center justify-center">
-                 <RefreshCcw className="h-6 w-6 text-primary/40" />
-              </div>
             </div>
             <div className="text-center">
-              <p className="text-slate-900 font-bold text-xl">数据同步中...</p>
-              <p className="text-slate-500 mt-1">正在安全连接至飞书开放平台</p>
+              <p className="text-slate-900 font-bold text-xl">数据抓取中...</p>
+              <p className="text-slate-500 mt-1">正在连接 GitHub 原始文件</p>
             </div>
           </div>
         ) : (
@@ -111,16 +107,11 @@ export default function DashboardPage() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t bg-white py-8">
+      <footer className="border-t bg-white py-8 mt-12">
         <div className="container mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-4">
            <p className="text-sm text-slate-400 font-medium">
-             &copy; 2024 Intelligent Dashboard · Powered by Feishu Open API
+             &copy; 2024 Intelligent Dashboard · 数据源: 直播话术_数据表.csv
            </p>
-           <div className="flex items-center gap-6 text-xs text-slate-400 font-medium">
-             <span className="hover:text-primary cursor-pointer transition-colors">隐私政策</span>
-             <span className="hover:text-primary cursor-pointer transition-colors">使用条款</span>
-             <span className="hover:text-primary cursor-pointer transition-colors">技术支持</span>
-           </div>
         </div>
       </footer>
     </div>

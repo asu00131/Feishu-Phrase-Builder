@@ -1,16 +1,10 @@
-export interface TableData {
+export type TableData = {
   id: string;
-  projectName: string;
-  status: '进行中' | '已完成' | '未开始' | '延迟';
-  owner: string;
-  startDate: string;
-  endDate: string;
-  priority: '高' | '中' | '低';
-  progress: number;
-}
+  [key: string]: any;
+};
 
 export type SortDirection = 'asc' | 'desc' | null;
 export type SortConfig = {
-  key: keyof TableData | null;
+  key: string | null;
   direction: SortDirection;
 };
