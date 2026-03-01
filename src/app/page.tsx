@@ -5,16 +5,15 @@ import { fetchFeishuData } from "@/lib/mock-data"
 import { TableData } from "@/lib/types"
 import { 
   RefreshCcw, 
-  Sparkles,
   RotateCcw,
   Layers,
-  ShoppingBag
+  ShoppingBag,
+  Sparkles
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import { AIInsight } from "@/components/dashboard/ai-insight"
 import { DataTable } from "@/components/dashboard/data-table"
 
 export default function DashboardPage() {
@@ -38,8 +37,9 @@ export default function DashboardPage() {
         if (catKey) {
           const categories = Array.from(new Set(result.map(item => item[catKey]).filter(Boolean)))
           // 默认展示条件：场景 = 灯饰介绍
-          if (categories.includes('灯饰介绍')) {
-            setSelectedCategory('灯饰介绍')
+          const target = categories.find(c => String(c).includes('灯饰介绍'))
+          if (target) {
+            setSelectedCategory(String(target))
           } else if (categories.length > 0) {
             setSelectedCategory(categories[0] as string)
           }
@@ -121,7 +121,6 @@ export default function DashboardPage() {
           </Tabs>
         </div>
         <div className="flex items-center gap-4">
-          {!loading && data.length > 0 && <AIInsight currentData={data} />}
           <Button variant="outline" size="sm" onClick={loadData} disabled={loading} className="rounded-full bg-white hover:bg-slate-50 border-slate-200">
             <RefreshCcw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> 同步飞书数据
           </Button>
@@ -245,16 +244,16 @@ export default function DashboardPage() {
                 <div className="flex flex-wrap gap-2.5">
                   {allCategories.map(cat => (
                     <Button
-                      key={cat}
-                      variant={selectedCategory === cat ? "default" : "outline"}
-                      onClick={() => setSelectedCategory(cat)}
+                      key={String(cat)}
+                      variant={selectedCategory === String(cat) ? "default" : "outline"}
+                      onClick={() => setSelectedCategory(String(cat))}
                       className={`rounded-2xl px-5 h-10 font-bold transition-all border-slate-200 ${
-                        selectedCategory === cat 
+                        selectedCategory === String(cat) 
                         ? "bg-slate-900 text-white shadow-lg shadow-slate-200 scale-105" 
                         : "bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-300"
                       }`}
                     >
-                      {cat}
+                      {String(cat)}
                     </Button>
                   ))}
                   {allCategories.length === 0 && (
