@@ -226,6 +226,10 @@ export default function DashboardPage() {
     scriptAreaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }
 
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   return (
     <div className="flex flex-col min-h-screen bg-[#F8FAFC]">
       <header className="bg-white border-b px-8 py-3 flex items-center justify-between sticky top-0 z-50 shadow-sm">
@@ -237,10 +241,18 @@ export default function DashboardPage() {
           </div>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-auto">
             <TabsList className="bg-slate-100/50 p-1">
-              <TabsTrigger value="preview" className="rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm px-6 font-semibold">
+              <TabsTrigger 
+                value="preview" 
+                onClick={scrollToTop}
+                className="rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm px-6 font-semibold"
+              >
                 直播预览
               </TabsTrigger>
-              <TabsTrigger value="config" className="rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm px-6 font-semibold">
+              <TabsTrigger 
+                value="config" 
+                onClick={scrollToTop}
+                className="rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm px-6 font-semibold"
+              >
                 底层数据
               </TabsTrigger>
             </TabsList>
