@@ -379,22 +379,32 @@ export default function DashboardPage() {
                       {secondaryFilterKey || '具体内容'}
                     </Label>
                     <div className="flex flex-wrap gap-2 max-h-[240px] overflow-y-auto p-1 scrollbar-hide">
-                      {itemsInScene.map(item => (
-                        <Button
-                          key={item}
-                          variant={selectedItem === item ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setSelectedItem(item)}
-                          className={cn(
-                            "rounded-full px-4 h-9 font-semibold transition-all border-slate-200",
-                            selectedItem === item 
-                              ? "shadow-md scale-105 bg-primary text-primary-foreground" 
-                              : "bg-white hover:bg-slate-50 text-slate-600"
-                          )}
-                        >
-                          {item}
-                        </Button>
-                      ))}
+                      {itemsInScene.map(item => {
+                        // 寻找该条目对应的具体数据，以提取展示用的辅助字段（如时间段）
+                        const representative = data.find(d => 
+                          String(d[primaryFilterKey || ""]) === selectedScene && 
+                          String(d[secondaryFilterKey || ""]) === item
+                        );
+                        const timeSegment = getField(representative, ['时间段', '时段', '分钟', '时长']);
+                        const displayLabel = timeSegment ? `${item} (${timeSegment})` : item;
+
+                        return (
+                          <Button
+                            key={item}
+                            variant={selectedItem === item ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setSelectedItem(item)}
+                            className={cn(
+                              "rounded-full px-4 h-9 font-semibold transition-all border-slate-200",
+                              selectedItem === item 
+                                ? "shadow-md scale-105 bg-primary text-primary-foreground" 
+                                : "bg-white hover:bg-slate-50 text-slate-600"
+                            )}
+                          >
+                            {displayLabel}
+                          </Button>
+                        )
+                      })}
                       {itemsInScene.length === 0 && (
                         <p className="text-xs text-slate-400 italic py-4">请先选择有效的场景维度</p>
                       )}
