@@ -45,6 +45,9 @@ export default function DashboardPage() {
   const [loading, setLoading] = React.useState(true)
   const [activeTab, setActiveTab] = React.useState("preview")
   
+  // 用于滚动聚焦的 Ref
+  const scriptAreaRef = React.useRef<HTMLDivElement>(null)
+
   // 数据源配置状态
   const [csvUrl, setCsvUrl] = React.useState('https://raw.githubusercontent.com/asu00131/Feishu-Phrase-Builder/refs/heads/main/src/app/%E7%9B%B4%E6%92%AD%E8%AF%9D%E6%9C%AF_%E6%95%B0%E6%8D%AE%E8%A1%A8.csv')
   const [tempUrl, setTempUrl] = React.useState(csvUrl)
@@ -215,6 +218,12 @@ export default function DashboardPage() {
       const firstItem = data.find(item => String(item[primaryFilterKey]) === scene)?.[secondaryFilterKey]
       setSelectedItem(firstItem ? String(firstItem) : "")
     }
+  }
+
+  const handleItemClick = (item: string) => {
+    setSelectedItem(item)
+    // 点击按钮后平滑滚动到话术展示区
+    scriptAreaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }
 
   return (
@@ -393,7 +402,7 @@ export default function DashboardPage() {
                             key={item}
                             variant={selectedItem === item ? "default" : "outline"}
                             size="sm"
-                            onClick={() => setSelectedItem(item)}
+                            onClick={() => handleItemClick(item)}
                             className={cn(
                               "rounded-full px-4 h-9 font-semibold transition-all border-slate-200",
                               selectedItem === item 
@@ -414,7 +423,7 @@ export default function DashboardPage() {
               </div>
 
               {/* 核心话术展示区 */}
-              <div className="bg-white rounded-[3rem] p-10 shadow-xl shadow-slate-200/40 border border-slate-100 relative overflow-hidden min-h-[500px]">
+              <div ref={scriptAreaRef} className="bg-white rounded-[3rem] p-10 shadow-xl shadow-slate-200/40 border border-slate-100 relative overflow-hidden min-h-[500px] scroll-mt-20">
                 <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-50 rounded-full -mr-24 -mt-24" />
                 <div className="flex items-center gap-2 mb-8 relative">
                   <Badge className="bg-emerald-500 text-white border-none px-4 py-1 rounded-full font-bold">
