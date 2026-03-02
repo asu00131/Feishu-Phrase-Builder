@@ -373,12 +373,12 @@ export default function DashboardPage() {
                     </Select>
                   </div>
 
-                  {/* 第二级：次维度 (改为按钮自适应排列) */}
+                  {/* 第二级：次维度 (按钮集合展示) */}
                   <div className="space-y-3">
                     <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
                       {secondaryFilterKey || '具体内容'}
                     </Label>
-                    <div className="flex flex-wrap gap-2 max-h-[240px] overflow-y-auto p-1 scrollbar-hide">
+                    <div className="flex flex-wrap gap-2 max-h-[400px] overflow-y-auto p-1 scrollbar-hide">
                       {itemsInScene.map(item => {
                         // 寻找该条目对应的具体数据，以提取展示用的辅助字段（如时间段）
                         const representative = data.find(d => 
