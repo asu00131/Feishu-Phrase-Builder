@@ -1,40 +1,70 @@
 import { TableData } from './types';
 
 /**
- * 核心 CSV 解析逻辑，支持从字符串直接解析
+ * 健壮的 CSV 解析器
+ * 支持处理单元格内的换行符、逗号以及被双引号包裹的特殊内容
  */
 export function parseCSVContent(text: string): TableData[] {
-  // 简单的 CSV 解析器，处理引号中的逗号
-  const parseCSVLine = (line: string) => {
-    const result = [];
-    let cur = '';
-    let inQuote = false;
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i];
-      if (char === '"') {
-        inQuote = !inQuote;
-      } else if (char === ',' && !inQuote) {
-        result.push(cur.trim().replace(/^"|"$/g, ''));
-        cur = '';
+  const result: string[][] = [];
+  let row: string[] = [];
+  let cell = '';
+  let inQuotes = false;
+
+  // 逐字符遍历，确保正确处理引号内的内容
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    const nextChar = text[i + 1];
+
+    if (char === '"') {
+      if (inQuotes && nextChar === '"') {
+        // 处理 CSV 中的转义双引号 ""
+        cell += '"';
+        i++;
       } else {
-        cur += char;
+        // 切换引号状态
+        inQuotes = !inQuotes;
       }
+    } else if (char === ',' && !inQuotes) {
+      // 单元格结束
+      row.push(cell.trim());
+      cell = '';
+    } else if ((char === '\n' || char === '\r') && !inQuotes) {
+      // 真正的行结束（非引号内换行）
+      if (char === '\r' && nextChar === '\n') {
+        i++;
+      }
+      row.push(cell.trim());
+      // 过滤空行
+      if (row.length > 0 && row.some(c => c !== '')) {
+        result.push(row);
+      }
+      row = [];
+      cell = '';
+    } else {
+      cell += char;
     }
-    result.push(cur.trim().replace(/^"|"$/g, ''));
-    return result;
-  };
+  }
 
-  const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
-  if (lines.length < 2) return [];
+  // 处理最后剩余的内容
+  if (cell !== '' || row.length > 0) {
+    row.push(cell.trim());
+    if (row.length > 0 && row.some(c => c !== '')) {
+      result.push(row);
+    }
+  }
 
-  const headers = parseCSVLine(lines[0]);
+  if (result.length < 2) return [];
+
+  const headers = result[0];
   
-  return lines.slice(1).map((line, idx) => {
-    const values = parseCSVLine(line);
+  return result.slice(1).map((values, idx) => {
     const obj: TableData = { id: idx.toString() };
     headers.forEach((header, i) => {
       if (header) {
-        obj[header] = values[i] || '';
+        // 移除多余的引号包裹并处理转义
+        let val = values[i] || '';
+        val = val.replace(/^"|"$/g, '').replace(/""/g, '"');
+        obj[header] = val;
       }
     });
     return obj;

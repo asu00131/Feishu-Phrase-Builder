@@ -1,4 +1,3 @@
-
 "use client"
 
 import * as React from "react"
@@ -77,10 +76,10 @@ export default function DashboardPage() {
   const primaryFilterKey = React.useMemo(() => {
     if (data.length === 0) return null
     const keys = Object.keys(data[0]).filter(k => k !== 'id')
-    // 强制匹配“场景”
+    // 优先识别“场景”
     const sceneKey = keys.find(k => k === '场景')
     if (sceneKey) return sceneKey
-    // 尝试匹配相关关键字
+    // 其次匹配相关关键字
     const keywordMatch = keys.find(k => ['类别', '分类', '模块', '维度'].some(kw => k.includes(kw)))
     // 兜底返回第一个有效列
     return keywordMatch || keys[0]
@@ -90,7 +89,7 @@ export default function DashboardPage() {
   const secondaryFilterKey = React.useMemo(() => {
     if (data.length === 0 || !primaryFilterKey) return null
     const keys = Object.keys(data[0]).filter(k => k !== 'id' && k !== primaryFilterKey)
-    // 尝试匹配相关关键字
+    // 优先匹配产品/名称/时间段等具有识别度的字段
     const keywordMatch = keys.find(k => ['产品', '名称', '自动序号', '时间段', '短句话术'].some(kw => k.includes(kw)))
     // 兜底返回第一个非主筛选列
     return keywordMatch || keys[0]
@@ -100,7 +99,7 @@ export default function DashboardPage() {
   const initializeLayout = React.useCallback((result: TableData[]) => {
     if (result.length > 0 && primaryFilterKey) {
       const scenes = Array.from(new Set(result.map(item => String(item[primaryFilterKey])).filter(Boolean)))
-      // 优先寻找“灯饰介绍”
+      // 优先寻找“灯饰介绍”作为默认选中
       const defaultScene = scenes.find(s => s.includes('灯饰介绍')) || scenes[0]
       setSelectedScene(defaultScene)
 
@@ -121,7 +120,6 @@ export default function DashboardPage() {
     try {
       const result = await fetchFeishuData(urlOverride || csvUrl)
       setData(result)
-      // 需要在数据加载后，根据新识别的 Key 初始化
     } finally {
       setLoading(false)
     }
