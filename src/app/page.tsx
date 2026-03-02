@@ -234,7 +234,6 @@ export default function DashboardPage() {
             <div className="bg-primary w-8 h-8 rounded-lg flex items-center justify-center">
               <Sparkles className="h-5 w-5 text-white" />
             </div>
-            <h1 className="font-bold text-xl tracking-tight">直播话术智能看板</h1>
           </div>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-auto">
             <TabsList className="bg-slate-100/50 p-1">
