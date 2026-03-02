@@ -38,6 +38,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { cn } from "@/lib/utils"
 
 export default function DashboardPage() {
   const [data, setData] = React.useState<TableData[]>([])
@@ -72,26 +73,21 @@ export default function DashboardPage() {
     return key ? item[key] : null
   }, [getFieldKey])
 
-  // 计算属性：第一级过滤字段名称 (有场景则设为默认，否则选中第一个字段)
+  // 计算属性：第一级过滤字段名称 (优先找“场景”，否则找分类，最后找第一列)
   const primaryFilterKey = React.useMemo(() => {
     if (data.length === 0) return null
     const keys = Object.keys(data[0]).filter(k => k !== 'id')
-    // 优先识别“场景”
     const sceneKey = keys.find(k => k === '场景')
     if (sceneKey) return sceneKey
-    // 其次匹配相关关键字
     const keywordMatch = keys.find(k => ['类别', '分类', '模块', '维度'].some(kw => k.includes(kw)))
-    // 兜底返回第一个有效列
     return keywordMatch || keys[0]
   }, [data])
 
-  // 计算属性：第二级过滤字段名称
+  // 计算属性：第二级过滤字段名称 (排除掉第一级后的识别)
   const secondaryFilterKey = React.useMemo(() => {
     if (data.length === 0 || !primaryFilterKey) return null
     const keys = Object.keys(data[0]).filter(k => k !== 'id' && k !== primaryFilterKey)
-    // 优先匹配产品/名称/时间段等具有识别度的字段
-    const keywordMatch = keys.find(k => ['产品', '名称', '自动序号', '时间段', '短句话术'].some(kw => k.includes(kw)))
-    // 兜底返回第一个非主筛选列
+    const keywordMatch = keys.find(k => ['产品', '名称', '自动序号', '序号', '时间段'].some(kw => k.includes(kw)))
     return keywordMatch || keys[0]
   }, [data, primaryFilterKey])
 
@@ -357,15 +353,15 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                <div className="space-y-6">
-                  {/* 第一级：主维度 */}
+                <div className="space-y-8">
+                  {/* 第一级：主维度 (下拉框保持整洁) */}
                   <div className="space-y-2.5">
                     <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
                       {primaryFilterKey || '第一级筛选'}
                     </Label>
                     <Select value={selectedScene} onValueChange={handleSceneChange}>
                       <SelectTrigger className="w-full h-11 rounded-xl border-slate-200 bg-white font-bold text-slate-700">
-                        <SelectValue placeholder="请选择内容" />
+                        <SelectValue placeholder="请选择场景" />
                       </SelectTrigger>
                       <SelectContent className="rounded-xl">
                         {allScenes.map(scene => (
@@ -377,28 +373,37 @@ export default function DashboardPage() {
                     </Select>
                   </div>
 
-                  {/* 第二级：次维度 */}
-                  <div className="space-y-2.5">
+                  {/* 第二级：次维度 (改为按钮自适应排列) */}
+                  <div className="space-y-3">
                     <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                      {secondaryFilterKey || '第二级筛选'}
+                      {secondaryFilterKey || '具体内容'}
                     </Label>
-                    <Select value={selectedItem} onValueChange={setSelectedItem}>
-                      <SelectTrigger className="w-full h-11 rounded-xl border-slate-200 bg-white font-bold text-slate-700">
-                        <SelectValue placeholder="请选择具体条目" />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-xl">
-                        {itemsInScene.map(item => (
-                          <SelectItem key={item} value={item} className="font-semibold">
-                            {item}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="flex flex-wrap gap-2 max-h-[240px] overflow-y-auto p-1 scrollbar-hide">
+                      {itemsInScene.map(item => (
+                        <Button
+                          key={item}
+                          variant={selectedItem === item ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setSelectedItem(item)}
+                          className={cn(
+                            "rounded-full px-4 h-9 font-semibold transition-all border-slate-200",
+                            selectedItem === item 
+                              ? "shadow-md scale-105 bg-primary text-primary-foreground" 
+                              : "bg-white hover:bg-slate-50 text-slate-600"
+                          )}
+                        >
+                          {item}
+                        </Button>
+                      ))}
+                      {itemsInScene.length === 0 && (
+                        <p className="text-xs text-slate-400 italic py-4">请先选择有效的场景维度</p>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* 核心话术展示 */}
+              {/* 核心话术展示区 */}
               <div className="bg-white rounded-[3rem] p-10 shadow-xl shadow-slate-200/40 border border-slate-100 relative overflow-hidden min-h-[500px]">
                 <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-50 rounded-full -mr-24 -mt-24" />
                 <div className="flex items-center gap-2 mb-8 relative">
@@ -434,7 +439,7 @@ export default function DashboardPage() {
                     ) : (
                       <div className="flex flex-col items-center justify-center h-full pt-20 text-slate-300">
                         <ShoppingBag className="h-16 w-16 mb-4 opacity-10" />
-                        <p className="text-sm">请选择对应项以查看话术</p>
+                        <p className="text-sm">请在上方选择具体项以查看详情</p>
                       </div>
                     )}
                   </div>
